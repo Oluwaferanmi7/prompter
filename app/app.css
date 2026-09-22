@@ -483,6 +483,57 @@ svg {
   }
 }
 
+.b.mic.on {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% {
+    box-shadow: 0 0 0 6px rgba(255, 222, 89, 0.25);
+  }
+}
+/* what voice glide heard (not mirrored) */
+.heard {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--sat) + 44px);
+  transform: translateX(-50%);
+  max-width: min(90%, 520px);
+  padding: 6px 12px;
+  border-radius: 99px;
+  background: rgba(30, 30, 34, 0.75);
+  border: 1px solid rgba(255, 222, 89, 0.35);
+  color: #f6f1f1;
+  font-family: var(--f-ui);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  z-index: 4;
+}
+.heard::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--yellow);
+  margin-right: 7px;
+  animation: blink 1.2s infinite;
+}
+.heard[data-status='blocked']::before,
+.heard[data-status='unsupported']::before {
+  background: var(--bad);
+  animation: none;
+}
+.pv-heard {
+  top: auto;
+  bottom: 10px;
+  left: 12px;
+  transform: none;
+  max-width: calc(100% - 110px);
+}
+
 /* Aa popover */
 .pop {
   position: absolute;

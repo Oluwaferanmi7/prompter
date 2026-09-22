@@ -77,16 +77,19 @@ function handle(msg, from) {
         c.setSpeed(msg.v);
         break;
       case 'seek':
-        e.seekAnchor(msg.a, msg.drag);
+        c.seekAnchor(msg.a, msg.drag);
         break;
       case 'para':
-        e.para(msg.dir);
+        c.para(msg.dir);
         break;
       case 'nudge':
-        e.nudge(msg.lines);
+        c.nudge(msg.lines);
         break;
       case 'top':
-        e.top();
+        c.top();
+        break;
+      case 'voice':
+        e.setVoice(msg.on);
         break;
       case 'select':
         c.select(msg.id, { fromRemote: true });

@@ -52,6 +52,10 @@ export function createRemote({ link, toast, onOpenLocal }) {
       if (['lineHeight', 'align', 'cuePos'].includes(key)) layoutPreview();
       controls.update();
     },
+    setVoice(on) {
+      ps.voice = on;
+      send({ t: 'voice', on });
+    },
     select(id) {
       ps.scriptId = id;
       send({ t: 'select', id });
@@ -205,6 +209,9 @@ export function createRemote({ link, toast, onOpenLocal }) {
       if (!userActive()) targetY = yForAnchor(msg.a, m);
       $('r-progress').style.width = Math.round((msg.progress || 0) * 1000) / 10 + '%';
       $('r-left').textContent = fmtTime(msg.remain);
+      const heard = $('r-heard');
+      heard.hidden = !msg.voice;
+      if (msg.voice) heard.textContent = msg.heard || 'Listening…';
       if (targetSettings.speed !== msg.speed) targetSettings.speed = msg.speed;
       controls.update();
     },
