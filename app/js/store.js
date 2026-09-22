@@ -1,17 +1,20 @@
-// Local persistence: scripts (library lives on the remote), display settings, pairing code.
+// Local persistence for this phone: display settings, app preferences, pairing codes.
+// Test bench only: ?bench=a|b keeps two same-origin frames from sharing one storage.
+export const NS = (() => {
+  const b = new URLSearchParams(location.search).get('bench');
+  return b ? `bench.${b}.` : '';
+})();
 const K = {
-  scripts: 'tp.scripts',
-  active: 'tp.activeId',
   settings: 'tp.settings',
+  prefs: 'tp.prefs',
   code: 'tp.code',
   remoteCode: 'tp.remoteCode',
-  cache: 'tp.prompterCache',
-  role: 'tp.lastRole',
+  pos: 'tp.pos',
 };
 
 function read(key, fallback) {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = localStorage.getItem(NS + key);
     return raw == null ? fallback : JSON.parse(raw);
   } catch {
     return fallback;
@@ -19,14 +22,15 @@ function read(key, fallback) {
 }
 function write(key, value) {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    localStorage.setItem(NS + key, JSON.stringify(value));
   } catch {
     /* storage full or blocked — app still works for this session */
   }
 }
 
+// Display settings apply to THIS phone's teleprompter. A remote edits the target's copy.
 export const DEFAULT_SETTINGS = {
-  fontSize: 56, // px on the prompter
+  fontSize: 56,
   lineHeight: 1.4,
   margin: 6, // % side padding
   mirrorX: true, // Desview glass reflects left↔right
@@ -35,7 +39,7 @@ export const DEFAULT_SETTINGS = {
   showCue: true,
   align: 'left',
   theme: 'white', // white | yellow | light
-  countdown: 3, // seconds, 0 = off
+  countdown: 3, // seconds before scrolling starts, 0 = off
   speed: 6, // 1..30 → speed * 0.1 lines/second
 };
 
@@ -46,45 +50,20 @@ export function saveSettings(s) {
   write(K.settings, s);
 }
 
+// App preferences (how this phone's UI looks/behaves).
+export const DEFAULT_PREFS = {
+  mode: 'auto', // auto | dark | light
+  showBar: true, // control bar on the teleprompter screen
+  seenTip: false,
+};
+export function getPrefs() {
+  return { ...DEFAULT_PREFS, ...read(K.prefs, {}) };
+}
+export function savePrefs(p) {
+  write(K.prefs, p);
+}
+
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
-
-const WELCOME = `Welcome to your teleprompter.
-
-This is a sample script. Open the Scripts tab on your remote to create your own, or tap the pencil to edit this one live.
-
-Press play to start scrolling. Drag the preview on the remote to move the teleprompter to the exact same spot.
-
-Use the arrows to jump back or forward a paragraph when you need a retake.
-
-The Display tab controls font size, line spacing, margins and mirroring for the Desview glass.
-
-Break a leg.`;
-
-export function getScripts() {
-  let list = read(K.scripts, null);
-  if (!Array.isArray(list) || !list.length) {
-    list = [{ id: uid(), title: 'Welcome', text: WELCOME, updated: Date.now() }];
-    write(K.scripts, list);
-  }
-  return list;
-}
-export function saveScripts(list) {
-  write(K.scripts, list);
-}
-export function getActiveId() {
-  return read(K.active, null);
-}
-export function setActiveId(id) {
-  write(K.active, id);
-}
-
-// Prompter keeps the last script it was sent so it can work standalone after a reload.
-export function getPrompterCache() {
-  return read(K.cache, null);
-}
-export function savePrompterCache(c) {
-  write(K.cache, c);
-}
 
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export function newCode() {
@@ -94,7 +73,7 @@ export function newCode() {
   for (const n of buf) c += ALPHABET[n % ALPHABET.length];
   return c;
 }
-export function getPrompterCode() {
+export function getMyCode() {
   let c = read(K.code, null);
   if (!c) {
     c = newCode();
@@ -102,7 +81,7 @@ export function getPrompterCode() {
   }
   return c;
 }
-export function setPrompterCode(c) {
+export function setMyCode(c) {
   write(K.code, c);
 }
 export function getRemoteCode() {
@@ -111,9 +90,11 @@ export function getRemoteCode() {
 export function setRemoteCode(c) {
   write(K.remoteCode, c);
 }
-export function getLastRole() {
-  return read(K.role, null);
+
+// Last reading position so a reload lands where you were.
+export function getPos() {
+  return read(K.pos, null);
 }
-export function setLastRole(r) {
-  write(K.role, r);
+export function savePos(p) {
+  write(K.pos, p);
 }

@@ -67,10 +67,10 @@ function shade(u, v, { rounded, scale }) {
   let a = 1;
   if (rounded && sdRoundRect(u, v, 0.5, 0.5, 0.5, 0.5, 0.225) > 0) a = 0;
   // background: deep charcoal with a subtle warm glow at the cue line
-  const glow = Math.exp(-(((v - 0.5) / 0.2) ** 2)) * 0.12;
-  let r = 16 + 40 * glow + (1 - v) * 10;
-  let g = 16 + 10 * glow + (1 - v) * 10;
-  let b = 20 + 8 * glow + (1 - v) * 12;
+  const glow = Math.exp(-(((v - 0.5) / 0.22) ** 2)) * 0.18;
+  let r = 51 + 60 * glow - v * 14;
+  let g = 51 + 40 * glow - v * 14;
+  let b = 51 + 10 * glow - v * 12;
   const put = (cr, cg, cb, alpha) => {
     r = r * (1 - alpha) + cr * alpha;
     g = g * (1 - alpha) + cg * alpha;
@@ -81,8 +81,8 @@ function shade(u, v, { rounded, scale }) {
     [0.5, 0.3, 0.8, 1],
     [0.67, 0.3, 0.62, 0.4],
   ];
-  for (const [cy, x0, x1, alpha] of lines) if (sdCapsule(x, y, x0, x1, cy, 0.042) <= 0) put(255, 255, 255, alpha);
-  if (inTriangle(x, y, 0.12, 0.235, 0.5, 0.07)) put(255, 77, 61, 1);
+  for (const [cy, x0, x1, alpha] of lines) if (sdCapsule(x, y, x0, x1, cy, 0.042) <= 0) put(...(alpha === 1 ? [246, 241, 241] : [216, 218, 218]), alpha === 1 ? 1 : 0.55);
+  if (inTriangle(x, y, 0.12, 0.235, 0.5, 0.07)) put(255, 222, 89, 1);
   return [r, g, b, a * 255];
 }
 

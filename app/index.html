@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>Prompter</title>
+    <title>LiM Prompter</title>
     <meta name="description" content="Free teleprompter with phone-to-phone remote control, built for the Desview." />
-    <meta name="theme-color" content="#0b0b0d" />
+    <meta name="theme-color" content="#333333" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Prompter" />
+    <meta name="apple-mobile-web-app-title" content="LiM Prompter" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
@@ -19,52 +19,8 @@
     <script type="module" src="js/main.js"></script>
   </head>
   <body>
-    <!-- ============================== HOME ============================== -->
-    <section id="home" class="view" hidden>
-      <div class="home-inner">
-        <div class="brand">
-          <img src="icons/icon-192.png" alt="" width="64" height="64" />
-          <div>
-            <h1>Prompter</h1>
-            <p class="muted">Teleprompter + remote for the Desview</p>
-          </div>
-        </div>
-
-        <p class="home-q">What is this phone doing?</p>
-
-        <button class="role-card" data-role="prompter">
-          <span class="role-ico" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2.5" /><path d="M9 7h6M9 10h6M9 13h4" /></svg>
-          </span>
-          <span class="role-text">
-            <strong>Teleprompter</strong>
-            <span class="muted">This phone goes in the Desview</span>
-          </span>
-          <span class="chev" aria-hidden="true">›</span>
-        </button>
-
-        <button class="role-card" data-role="remote">
-          <span class="role-ico accent" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="3" /><path d="M11 9l3 2-3 2z" /><path d="M10 17h4" /></svg>
-          </span>
-          <span class="role-text">
-            <strong>Remote</strong>
-            <span class="muted">Control the teleprompter &amp; edit scripts</span>
-          </span>
-          <span class="chev" aria-hidden="true">›</span>
-        </button>
-
-        <div id="install-tip" class="install-tip" hidden>
-          <strong>Install it:</strong> tap <span class="share-ico" aria-label="Share">
-            <svg viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4" /><path d="M6 11v9h12v-9" /></svg></span>
-          then <em>Add to Home Screen</em>. Do this on both phones.
-        </div>
-        <p class="home-foot muted">Both phones need internet to pair. Scripts are saved on the remote phone.</p>
-      </div>
-    </section>
-
-    <!-- ============================ PROMPTER ============================ -->
-    <section id="prompter" class="view prompter" hidden>
+    <!-- ============================ THIS PHONE'S TELEPROMPTER ============================ -->
+    <section id="prompter" class="view prompter">
       <div class="stage" id="p-stage">
         <div class="scroller" id="p-scroller">
           <div class="p-content" id="p-content"></div>
@@ -74,154 +30,34 @@
         <div class="countdown" id="p-count" hidden></div>
       </div>
 
-      <!-- not mirrored: pairing info while waiting -->
-      <div class="p-pair" id="p-pair">
-        <div class="p-pair-card">
-          <div class="p-pair-label">Pairing code</div>
-          <div class="p-code" id="p-code">····</div>
-          <div class="p-status" id="p-status">Starting…</div>
-          <p class="p-hint">On the other phone open <strong>Prompter → Remote</strong> and enter this code.</p>
-          <div class="p-pair-actions">
-            <button class="btn ghost small" id="p-newcode">New code</button>
-            <button class="btn ghost small" id="p-hidepair">Hide</button>
-          </div>
-        </div>
+      <!-- not mirrored -->
+      <div class="p-top" id="p-top">
+        <span class="wordmark"><b>LiM</b> Prompter</span>
+        <span class="spacer"></span>
+        <span class="ctrl-dot" id="p-ctrl" hidden title="A remote is controlling this phone"><i></i>Remote in control</span>
+        <button class="chip" id="p-remote" hidden><i></i><span></span> ›</button>
       </div>
-
-      <div class="p-dot" id="p-dot" aria-hidden="true"></div>
-
-      <!-- local controls, shown on tap (not mirrored) -->
-      <div class="p-hud" id="p-hud" hidden>
-        <button class="hud-btn" id="h-exit" aria-label="Exit">✕</button>
-        <button class="hud-btn" id="h-pair">Code</button>
-        <span class="hud-sp"></span>
-        <button class="hud-btn" id="h-slower" aria-label="Slower">−</button>
-        <span class="hud-speed" id="h-speed">6.0</span>
-        <button class="hud-btn" id="h-faster" aria-label="Faster">+</button>
-        <button class="hud-btn play" id="h-play" aria-label="Play">&#x25B6;&#xFE0E;</button>
-        <button class="hud-btn" id="h-top" aria-label="Back to top">⤒</button>
-      </div>
+      <!-- control bar + panel are mounted here by controls.js -->
     </section>
 
-    <!-- ============================= REMOTE ============================= -->
+    <!-- ============================ REMOTE (controls another phone) ============================ -->
     <section id="remote" class="view remote" hidden>
       <header class="r-top">
-        <button class="icon-btn" id="r-home" aria-label="Home">
-          <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg>
-        </button>
+        <button class="back-btn" id="r-back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg><span>My teleprompter</span></button>
         <div class="r-title" id="r-title">Remote</div>
-        <button class="pill" id="r-pill"><span class="dot"></span><span id="r-pill-text">Pair</span></button>
+        <button class="pill" id="r-pill"><span class="dot"></span><span>Not connected</span></button>
       </header>
-
-      <main class="r-main">
-        <!-- LIVE -->
-        <div class="panel" id="panel-live">
-          <div class="preview-wrap">
-            <div class="progress"><span id="r-progress"></span></div>
-            <div class="preview" id="r-preview">
-              <div class="pv-pad" id="r-padtop"></div>
-              <div class="pv-content" id="r-content"></div>
-              <div class="pv-pad" id="r-padbot"></div>
-            </div>
-            <div class="pv-cue" id="r-cue"><span></span></div>
-            <button class="fab" id="r-edit" aria-label="Edit script">
-              <svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M13.5 6.5l4 4" /></svg>
-            </button>
-            <div class="pv-meta"><span id="r-left">–:––</span> left</div>
-          </div>
-
-          <div class="transport">
-            <div class="t-row">
-              <button class="t-btn" id="r-top" aria-label="Back to top">
-                <svg viewBox="0 0 24 24"><path d="M6 4h12M12 20V8M7 13l5-5 5 5" /></svg>
-              </button>
-              <button class="t-btn" id="r-back" aria-label="Previous paragraph">
-                <svg viewBox="0 0 24 24"><path d="M11 6l-6 6 6 6M19 6l-6 6 6 6" /></svg>
-              </button>
-              <button class="t-play" id="r-play" aria-label="Play">
-                <svg class="i-play" viewBox="0 0 24 24"><path d="M8 5l12 7-12 7z" /></svg>
-                <svg class="i-pause" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z" /></svg>
-                <span class="i-count" id="r-count"></span>
-              </button>
-              <button class="t-btn" id="r-fwd" aria-label="Next paragraph">
-                <svg viewBox="0 0 24 24"><path d="M13 6l6 6-6 6M5 6l6 6-6 6" /></svg>
-              </button>
-              <button class="t-btn" id="r-font" aria-label="Font size">
-                <svg viewBox="0 0 24 24"><path d="M3 19l5-14 5 14M5 14h6M15 19l3.5-9 3.5 9M16 16h5" /></svg>
-              </button>
-            </div>
-            <div class="speed-row">
-              <button class="s-btn" id="r-slower" aria-label="Slower">−</button>
-              <div class="s-mid">
-                <input type="range" id="r-speed" min="1" max="30" step="0.5" value="6" aria-label="Scroll speed" />
-                <div class="s-label">Speed <b id="r-speed-val">6.0</b></div>
-              </div>
-              <button class="s-btn" id="r-faster" aria-label="Faster">+</button>
-            </div>
-          </div>
+      <div class="preview-wrap">
+        <div class="progress"><span id="r-progress"></span></div>
+        <div class="preview" id="r-preview">
+          <div class="pv-pad" id="r-padtop"></div>
+          <div class="pv-content" id="r-content"></div>
+          <div class="pv-pad" id="r-padbot"></div>
         </div>
-
-        <!-- SCRIPTS -->
-        <div class="panel" id="panel-scripts" hidden>
-          <div class="panel-head">
-            <h2>Scripts</h2>
-            <button class="btn primary small" id="s-new">+ New</button>
-          </div>
-          <ul class="script-list" id="s-list"></ul>
-          <div class="panel-foot">
-            <button class="btn ghost small" id="s-export">Back up scripts</button>
-            <label class="btn ghost small">Restore<input type="file" id="s-import" accept=".json,application/json" hidden /></label>
-          </div>
-        </div>
-
-        <!-- DISPLAY -->
-        <div class="panel" id="panel-display" hidden>
-          <div class="panel-head"><h2>Display</h2></div>
-          <div class="settings" id="d-settings"></div>
-        </div>
-      </main>
-
-      <nav class="tabbar">
-        <button class="tab active" data-tab="live">
-          <svg viewBox="0 0 24 24"><path d="M8 5l12 7-12 7z" /></svg><span>Remote</span>
-        </button>
-        <button class="tab" data-tab="scripts">
-          <svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z" /><path d="M9 11h7M9 15h7" /></svg><span>Scripts</span>
-        </button>
-        <button class="tab" data-tab="display">
-          <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg><span>Display</span>
-        </button>
-      </nav>
-
-      <!-- editor -->
-      <div class="sheet editor" id="editor" hidden>
-        <div class="ed-top">
-          <input class="ed-title" id="ed-title" placeholder="Script title" maxlength="80" />
-          <button class="btn primary small" id="ed-done">Done</button>
-        </div>
-        <textarea id="ed-text" placeholder="Paste or type your script…" spellcheck="true"></textarea>
-        <div class="ed-foot muted"><span id="ed-stats">0 words</span><span id="ed-live"></span></div>
+        <div class="pv-cue" id="r-cue"><span></span></div>
+        <div class="pv-meta"><span id="r-left">–:––</span> left</div>
       </div>
-
-      <!-- pair sheet -->
-      <div class="modal" id="pair" hidden>
-        <div class="modal-card">
-          <h3>Connect to teleprompter</h3>
-          <p class="muted">On the Desview phone, open <strong>Prompter → Teleprompter</strong>. Type the 4-character code it shows.</p>
-          <input id="pair-code" class="code-input" maxlength="4" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text" placeholder="ABCD" />
-          <div class="pair-status" id="pair-status"></div>
-          <div class="modal-actions">
-            <button class="btn ghost" id="pair-cancel">Close</button>
-            <button class="btn primary" id="pair-go">Connect</button>
-          </div>
-          <button class="linkish" id="pair-forget" hidden>Disconnect</button>
-        </div>
-      </div>
-
-      <!-- action sheet -->
-      <div class="modal" id="actions" hidden>
-        <div class="modal-card actions-card" id="actions-card"></div>
-      </div>
+      <!-- control bar + panel are mounted here by controls.js -->
     </section>
 
     <div class="toast" id="toast" hidden></div>
