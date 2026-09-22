@@ -9,7 +9,7 @@ import { createVoice } from './voice.js';
 
 const $ = (id) => document.getElementById(id);
 
-export function createPrompter({ link, settings, toast, onOpenRemote, onState, onSettings, onSelect }) {
+export function createPrompter({ link, settings, toast, onOpenRemote, onState, onSettings, onSelect, onVoiceStatus }) {
   const view = $('prompter');
   const stage = $('p-stage');
   const hudTop = $('p-top');
@@ -37,9 +37,10 @@ export function createPrompter({ link, settings, toast, onOpenRemote, onState, o
     onMove: (a) => engine.glideTo(a),
     onStatus: (s, detail) => {
       heardEl.dataset.status = s;
+      onVoiceStatus?.(s, detail);
       if (s === 'blocked' || s === 'unsupported') {
         engine.setVoice(false);
-        toast(detail || 'Voice glide unavailable');
+        toast((detail || 'Voice glide unavailable') + ' (this phone)');
       } else if (s === 'listening') heardEl.textContent = 'Listening…';
       else if (s === 'paused') heardEl.textContent = 'Paused';
       else if (s === 'starting') heardEl.textContent = 'Starting…';

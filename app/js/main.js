@@ -121,6 +121,9 @@ function handle(msg, from) {
       case 'upsert':
         lib.upsert(msg.script, 'remote');
         break;
+      case 'voice-status':
+        remote.onVoiceStatus(msg.s, msg.detail);
+        break;
     }
   }
 }
@@ -150,6 +153,7 @@ prompter = createPrompter({
   onState: (s) => link.sendToController({ t: 'state', ...s }),
   onSettings: (s) => link.sendToController({ t: 'settings', settings: s }),
   onSelect: (id) => link.sendToController({ t: 'select', id }),
+  onVoiceStatus: (s, detail) => link.sendToController({ t: 'voice-status', s, detail }),
 });
 remote = createRemote({ link, toast, onOpenLocal: showLocal });
 

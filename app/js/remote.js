@@ -215,6 +215,18 @@ export function createRemote({ link, toast, onOpenLocal }) {
       if (targetSettings.speed !== msg.speed) targetSettings.speed = msg.speed;
       controls.update();
     },
+    onVoiceStatus(s, detail) {
+      const heard = $('r-heard');
+      if (s === 'blocked' || s === 'unsupported') {
+        ps.voice = false;
+        toast(`Teleprompter phone: ${detail || 'voice glide unavailable'}`);
+        heard.hidden = true;
+      } else if (s === 'listening') {
+        heard.hidden = false;
+        heard.textContent = 'Listening…';
+      } else if (s === 'paused') heard.textContent = 'Paused (teleprompter phone in background)';
+      controls.update();
+    },
     onSettings(s) {
       targetSettings = { ...store.DEFAULT_SETTINGS, ...s };
       layoutPreview();
