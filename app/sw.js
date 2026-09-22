@@ -1,6 +1,6 @@
 // Offline cache for the app shell. Stale-while-revalidate: opens instantly (even with
 // no signal on set), fetches updates in the background for the next launch.
-const VERSION = 'prompter-v2';
+const VERSION = 'prompter-v4';
 const SHELL = [
   './',
   'index.html',
@@ -21,6 +21,7 @@ const SHELL = [
   'fonts/playfair-display.woff2',
   'fonts/montserrat.woff2',
   'fonts/raleway.woff2',
+  'icons/ls-mark-gold.png',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/apple-touch-icon.png',

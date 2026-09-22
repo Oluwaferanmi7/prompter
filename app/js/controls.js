@@ -170,6 +170,7 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
   // ------------------------------------------------------------------ panel
   const panel = h(`
     <div class="sheet panel" hidden>
+      <div class="sheet-brand"><img src="icons/ls-mark-gold.png" alt=""><span><b>LiM</b> Prompter</span></div>
       <header class="sheet-head">
         <h2 class="sheet-title">Scripts</h2>
         <button class="icon-btn" data-close aria-label="Close">${ICON.close}</button>
@@ -210,7 +211,7 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
   function renderScripts() {
     if (tab !== 'scripts') return;
     body.replaceChildren();
-    const head = h(`<div class="panel-head"><span class="muted">Saved on this phone${ctl.local ? '' : ' and synced to the teleprompter'}</span><button class="btn primary small">+ New</button></div>`);
+    const head = h(`<div class="panel-head"><span class="muted">${ctl.local ? 'Tap a script to open the teleprompter' : 'Tap a script to send it to the teleprompter'}</span><button class="btn primary small">+ New</button></div>`);
     head.querySelector('button').onclick = () => {
       const s = lib.create();
       ctl.select(s.id);

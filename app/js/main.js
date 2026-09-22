@@ -160,6 +160,13 @@ window.addEventListener('hashchange', route);
 prompter.start();
 route();
 
+// Cold start lands on Scripts (pick one, or add a new one). Returning from the
+// background doesn't re-run this, so a shoot in progress is never interrupted.
+if (!location.hash.startsWith('#/remote')) prompter.controls.openPanel('scripts');
+const splash = $('splash');
+splash?.addEventListener('animationend', (e) => e.animationName === 'splash-out' && splash.remove());
+setTimeout(() => splash?.remove(), 3500); // belt and braces
+
 const remembered = store.getRemoteCode();
 if (remembered) link.connect(remembered);
 
