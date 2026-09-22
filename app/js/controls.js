@@ -5,6 +5,7 @@
 import * as lib from './library.js';
 import * as store from './store.js';
 import { fmtTime, wordCount } from './render.js';
+import { fileToScript, ACCEPT } from './importer.js';
 
 // Builds nodes in the live document (a <template> fragment is inert and drops
 // checkbox state on adoption).
@@ -211,11 +212,33 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
   function renderScripts() {
     if (tab !== 'scripts') return;
     body.replaceChildren();
-    const head = h(`<div class="panel-head"><span class="muted">${ctl.local ? 'Tap a script to open the teleprompter' : 'Tap a script to send it to the teleprompter'}</span><button class="btn primary small">+ New</button></div>`);
+    const head = h(`<div class="panel-head"><span class="muted">${ctl.local ? 'Tap a script to open the teleprompter' : 'Tap a script to send it to the teleprompter'}</span><span class="head-btns"><label class="btn ghost small">Import<input type="file" accept="${ACCEPT}" multiple hidden></label><button class="btn primary small">+ New</button></span></div>`);
     head.querySelector('button').onclick = () => {
       const s = lib.create();
       ctl.select(s.id);
       openEditor(s.id, true);
+    };
+    head.querySelector('input[type=file]').onchange = async (e) => {
+      const files = [...(e.target.files || [])];
+      e.target.value = '';
+      const made = [];
+      for (const f of files) {
+        try {
+          const { title, text } = await fileToScript(f);
+          made.push(lib.create(title, text));
+        } catch (err) {
+          toast(err?.message || `Couldn't read ${f.name}`);
+        }
+      }
+      if (!made.length) return;
+      if (made.length === 1) {
+        ctl.select(made[0].id);
+        toast(`Imported “${made[0].title}”`);
+        closePanel();
+      } else {
+        toast(`Imported ${made.length} scripts`);
+        renderScripts();
+      }
     };
     const ul = h('<ul class="script-list"></ul>');
     const activeId = ctl.state.scriptId;

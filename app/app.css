@@ -823,6 +823,11 @@ svg {
   padding: 0 0 12px;
   font-size: 14px;
 }
+.head-btns {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
 .panel-foot {
   display: flex;
   gap: 10px;
