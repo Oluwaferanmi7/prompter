@@ -1,12 +1,14 @@
-# Prompter
+# LiM Prompter
 
 A free teleprompter web app (PWA) with phone-to-phone remote control, built for a Desview rig.
 
-**Live:** https://oluwaferanmi7.github.io/prompter/
+**Live:** https://oluwaferanmi7.github.io/prompter/ · **Voice glide test build:** https://oluwaferanmi7.github.io/prompter/voice/
 
-- One phone sits in the Desview as the **Teleprompter** (text mirrored for the glass).
-- Another phone is the **Remote**: play/pause, speed, jump by paragraph, drag the preview to move the prompter to the exact same spot, font size, line spacing, margins, mirroring, and a saved script library with live editing.
-- The phones pair with a 4-character code and talk directly over WebRTC ([PeerJS](https://peerjs.com), free public signalling + TURN). No accounts, no backend. Scripts stay in the remote phone's local storage.
+- Every phone is a teleprompter (text mirrored for the glass, control bar, script library, editor, display settings).
+- Any phone can control another: ⋯ → Connect, enter the other phone's 4-character code. Play/pause, speed, jump by paragraph, drag the preview to move the prompter to the exact same spot, font/spacing/mirror/flip, live script editing. Switch between "my teleprompter" and "remote" without disconnecting.
+- Losing the link never touches the script on screen; phones reconnect on their own.
+- Script libraries merge between paired phones. No accounts, no backend: phones talk directly over WebRTC ([PeerJS](https://peerjs.com) free signalling + TURN).
+- `voice` branch: voice glide — scroll follows your reading via on-device speech recognition, tolerant of ad-libs.
 
 ## Install on iPhone
 
@@ -14,6 +16,6 @@ Open the link in **Safari** → Share → **Add to Home Screen**. Do it on both 
 
 ## Develop
 
-No build step. `node tools/serve.mjs` then open http://localhost:5173 — or http://localhost:5173/dev.html for a side-by-side two-phone test bench.
+No build step. `node tools/serve.mjs` then open http://localhost:5173, or http://localhost:5173/dev.html for a side-by-side two-phone test bench. `node tools/test-voice.mjs` runs the voice matcher tests.
 
-Pushing to `main` deploys `app/` to GitHub Pages. Bump `VERSION` in `app/sw.js` when you ship so installed apps pick up the update.
+Pushing `main` deploys `app/` to the site root; pushing `voice` deploys its `app/` under `/voice/`. Bump `VERSION` in `app/sw.js` when you ship so installed apps pick up the update.
