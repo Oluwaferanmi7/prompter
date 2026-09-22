@@ -1,6 +1,6 @@
 // Offline cache for the app shell. Stale-while-revalidate: opens instantly (even with
 // no signal on set), fetches updates in the background for the next launch.
-const VERSION = 'prompter-v5-voice';
+const VERSION = 'prompter-v6-voice';
 const SHELL = [
   './',
   'index.html',
@@ -10,6 +10,7 @@ const SHELL = [
   'js/prompter.js',
   'js/remote.js',
   'js/controls.js',
+  'js/importer.js',
   'js/engine.js',
   'js/library.js',
   'js/link.js',
