@@ -45,9 +45,10 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
   }
 
   function remeasure(a = anchorAt(y, m)) {
+    const pending = seekTarget != null ? anchorAt(seekTarget, m) : null; // keep an in-flight seek
     m = measure(content);
     y = clampY(yForAnchor(a, m));
-    seekTarget = null;
+    seekTarget = pending ? clampY(yForAnchor(pending, m)) : null;
     lastAppliedY = NaN;
   }
 
@@ -185,6 +186,11 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
     toggle,
     setSpeed,
     seekAnchor: (a, drag) => seekTo(yForAnchor(a, m), drag ? 28 : 10),
+    setAnchor(a) {
+      y = clampY(yForAnchor(a, m));
+      seekTarget = null;
+      markDirty(true);
+    },
     para: (dir) => seekTo(paraStep(seekTarget ?? y, m, content, dir), 9),
     nudge: (lines) => seekTo((seekTarget ?? y) + lines * lineH(), 12),
     top() {

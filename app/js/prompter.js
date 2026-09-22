@@ -173,7 +173,7 @@ export function createPrompter({ link, settings, toast, onOpenRemote, onState, o
       const first = (pos && lib.get(pos.id)) || lib.active() || lib.all()[0];
       lib.setActiveId(first.id);
       engine.setScript(first, { resetPosition: true });
-      if (pos && pos.id === first.id) engine.seekAnchor(pos.a, true);
+      if (pos && pos.id === first.id) engine.setAnchor(pos.a);
       setBar(store.getPrefs().showBar);
       engine.start();
     },
