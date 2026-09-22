@@ -140,6 +140,107 @@ svg {
   inset: 0;
 }
 
+/* ------------------------------------------------------------------ splash */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: #333333;
+  color: #f6f1f1;
+  animation: splash-out 0.45s ease-in 1.75s forwards;
+}
+.splash-mark {
+  width: 140px;
+  height: 140px;
+  animation: mark-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.splash-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.splash-word {
+  font-family: var(--f-head);
+  font-size: 30px;
+  letter-spacing: 0.5px;
+  animation: word-in 0.6s ease-out 0.55s both;
+}
+.splash-word span {
+  font-weight: 800;
+  color: var(--yellow);
+}
+.splash-sub {
+  font-family: var(--f-ui);
+  font-size: 11px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: #d8dada;
+  opacity: 0.7;
+  animation: word-in 0.6s ease-out 0.85s both;
+}
+@keyframes mark-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6) rotate(-25deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+@keyframes word-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes splash-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash-mark,
+  .splash-word,
+  .splash-sub {
+    animation-duration: 0.01s;
+    animation-delay: 0s;
+  }
+  .splash {
+    animation-delay: 0.6s;
+  }
+}
+.sheet-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--f-head);
+  font-size: 13px;
+  color: var(--muted);
+  padding: calc(var(--sat) + 12px) 0 0 calc(var(--sal) + 18px);
+}
+.sheet-brand img {
+  width: 22px;
+  height: 22px;
+}
+.sheet-brand b {
+  color: var(--yellow);
+  font-weight: 800;
+}
+.sheet-brand + .sheet-head {
+  padding-top: 2px;
+}
+
 /* ------------------------------------------------------------------ buttons */
 .btn {
   display: inline-flex;
