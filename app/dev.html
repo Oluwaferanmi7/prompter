@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Prompter — two-phone test bench</title>
+    <title>LiM Prompter — two-phone test bench</title>
     <style>
       body { margin: 0; background: #222; display: flex; gap: 16px; padding: 16px; justify-content: center; font: 13px system-ui; color: #aaa; }
       .ph { display: flex; flex-direction: column; gap: 6px; align-items: center; }
@@ -10,7 +10,11 @@
     </style>
   </head>
   <body>
-    <div class="ph"><span>Teleprompter (landscape)</span><iframe id="a" src="index.html#/prompter" width="560" height="315"></iframe></div>
-    <div class="ph"><span>Remote</span><iframe id="b" src="index.html#/remote" width="375" height="740"></iframe></div>
+    <div class="ph"><span>Phone A (in the Desview, landscape)</span><iframe id="a" src="index.html?bench=a" width="560" height="315"></iframe></div>
+    <div class="ph"><span>Phone B (in hand)</span><iframe id="b" src="index.html?bench=b" width="375" height="740"></iframe></div>
+    <script>
+      // Each frame gets its own localStorage namespace so the two "phones" don't share codes/scripts.
+      // (Same-origin iframes share storage, so the app keys on ?bench=.)
+    </script>
   </body>
 </html>
