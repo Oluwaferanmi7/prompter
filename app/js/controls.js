@@ -464,6 +464,12 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
       closePanel();
       onOpenRemote?.();
     };
+    if (ctl.voiceInfo) {
+      const info = ctl.voiceInfo();
+      const diag = h(`<section class="set-group-wrap"><div class="set-title">Voice glide diagnostics</div><div class="set-group"><div class="set-row"><div class="set-label"><span>Speech recognition</span><b>${info.supported ? 'available' : 'not available'}</b></div><div class="set-sub">${navigator.userAgent.replace(/^Mozilla\/5\.0 /, '').slice(0, 90)}</div></div><div class="set-row"><pre class="diag"></pre></div></div><p class="muted small pad">If voice glide misbehaves, screenshot this and send it to Claude.</p></section>`);
+      diag.querySelector('pre').textContent = info.log.length ? info.log.slice(-14).join('\n') : 'No voice activity yet this session.';
+      el.appendChild(diag);
+    }
     el.querySelector('[data-newcode]').onclick = () => {
       const c = store.newCode();
       store.setMyCode(c);

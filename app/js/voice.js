@@ -110,9 +110,17 @@ export function createVoice({ onMove, onStatus, onHeard }) {
     finals = [];
   }
 
+  const events = []; // short diagnostics log (shown under Connect → Voice diagnostics)
+  function log(msg) {
+    const t = new Date();
+    events.push(`${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}:${String(t.getSeconds()).padStart(2, '0')} ${msg}`);
+    if (events.length > 40) events.shift();
+  }
   function status(s, detail) {
+    log(`status: ${s}${detail ? ' — ' + detail : ''}`);
     onStatus?.(s, detail);
   }
+  let resumeWatch = 0;
 
   function handleWords(words, isFinal) {
     if (!script.length || !words.length) return;
@@ -124,10 +132,16 @@ export function createVoice({ onMove, onStatus, onHeard }) {
     const need = Math.min(3, spoken.length);
     const ok = (h, maxTrail) => h && h.count >= need && h.trail <= maxTrail;
     if (!ok(hit, 3)) {
-      const wide = align(script, spoken, 0, script.length - 1, expect);
-      if (wide && wide.count >= Math.min(5, spoken.length) && wide.trail === 0 && (!hit || wide.count > hit.count + 1)) hit = wide;
+      // Truly lost nearby? Only then consider a jump elsewhere, and only on a long,
+      // clean run of matches — common words ("to the", "and it") must not move us.
+      const lostNearby = !hit || hit.count < 2;
+      const wide = lostNearby && spoken.length >= 6 ? align(script, spoken, 0, script.length - 1, expect) : null;
+      if (wide && wide.count >= 6 && wide.trail === 0) hit = wide;
       else if (!ok(hit, 3)) return; // off script: hold where we are
     }
+    // A big hop within the near window also needs more than a couple of hits.
+    if (Math.abs(hit.end - cursor) > 10 && hit.count < 4) return;
+    log(`move → ${hit.end} (${hit.count} hits)`);
     cursor = hit.end;
     lastMoveAt = performance.now();
     // Put the *next* word at the reading line (the eye reads slightly ahead).
@@ -146,7 +160,10 @@ export function createVoice({ onMove, onStatus, onHeard }) {
     rec.interimResults = true;
     rec.maxAlternatives = 1;
     rec.lang = navigator.language?.startsWith('en') ? navigator.language : 'en-US';
-    rec.onstart = () => status('listening');
+    rec.onstart = () => {
+      clearTimeout(resumeWatch);
+      status('listening');
+    };
     rec.onresult = (e) => {
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -163,9 +180,17 @@ export function createVoice({ onMove, onStatus, onHeard }) {
     };
     rec.onerror = (e) => {
       const t = e?.error;
+      log(`error: ${t}`);
       if (t === 'not-allowed' || t === 'service-not-allowed') {
         on = false;
-        status('blocked', t === 'not-allowed' ? 'Microphone access was denied' : 'Speech recognition is blocked here');
+        status(
+          'blocked',
+          t === 'not-allowed'
+            ? resumed
+              ? 'Voice glide paused — tap the mic to resume'
+              : 'Microphone access was denied'
+            : 'Speech recognition is blocked on this phone (needs a recent iOS with Dictation on)'
+        );
         return;
       }
       if (t === 'aborted') return;
@@ -173,7 +198,9 @@ export function createVoice({ onMove, onStatus, onHeard }) {
       status('waiting');
     };
     rec.onend = () => {
+      log('end');
       if (!on) return status('off');
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return; // resume on return
       restartTimer = setTimeout(start, 300);
     };
     try {
@@ -187,6 +214,7 @@ export function createVoice({ onMove, onStatus, onHeard }) {
   function stop() {
     on = false;
     clearTimeout(restartTimer);
+    clearTimeout(resumeWatch);
     try {
       rec?.stop?.();
     } catch {}
@@ -194,9 +222,37 @@ export function createVoice({ onMove, onStatus, onHeard }) {
     status('off');
   }
 
+  // iOS kills the recognizer when the app goes to the background; if we keep trying
+  // to restart it there it wedges for minutes. So: release it cleanly on hide, try
+  // once on return, and hand back to the mic button if iOS refuses (it needs a tap).
+  let resumed = false;
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
-      if (on && document.visibilityState === 'visible' && !rec) start();
+      if (!on) return;
+      if (document.visibilityState === 'hidden') {
+        clearTimeout(restartTimer);
+        const r = rec;
+        rec = null;
+        try {
+          r?.abort?.();
+        } catch {}
+        status('paused');
+      } else {
+        resumed = true;
+        start();
+        clearTimeout(resumeWatch);
+        resumeWatch = setTimeout(() => {
+          if (on && rec) {
+            log('resume timed out');
+            on = false;
+            try {
+              rec.abort?.();
+            } catch {}
+            rec = null;
+            status('blocked', 'Voice glide paused — tap the mic to resume');
+          }
+        }, 3000);
+      }
     });
   }
 
@@ -227,9 +283,14 @@ export function createVoice({ onMove, onStatus, onHeard }) {
         return false;
       }
       on = true;
+      resumed = false;
       finals = [];
+      log('enable (tap)');
       start();
       return true;
+    },
+    get log() {
+      return events.slice();
     },
     disable: stop,
     get idleFor() {

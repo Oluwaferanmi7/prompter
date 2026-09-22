@@ -40,7 +40,9 @@ export function createPrompter({ link, settings, toast, onOpenRemote, onState, o
       if (s === 'blocked' || s === 'unsupported') {
         engine.setVoice(false);
         toast(detail || 'Voice glide unavailable');
-      } else if (s === 'listening' && !heardEl.textContent) heardEl.textContent = 'Listening…';
+      } else if (s === 'listening') heardEl.textContent = 'Listening…';
+      else if (s === 'paused') heardEl.textContent = 'Paused';
+      else if (s === 'starting') heardEl.textContent = 'Starting…';
       controls.update();
     },
     onHeard: (t) => {
@@ -98,6 +100,7 @@ export function createPrompter({ link, settings, toast, onOpenRemote, onState, o
       voiceResync();
     },
     setVoice: (on) => engine.setVoice(on),
+    voiceInfo: () => ({ supported: voice.supported, on: engine.voice, log: voice.log }),
     setSpeed(v) {
       engine.setSpeed(v);
       store.saveSettings(engine.settings);

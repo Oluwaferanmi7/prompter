@@ -627,6 +627,15 @@ svg {
   background: var(--bad);
   animation: none;
 }
+.diag {
+  margin: 0;
+  font: 11px/1.5 ui-monospace, 'SF Mono', Menlo, monospace;
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+  -webkit-user-select: text;
+}
 .pv-heard {
   top: auto;
   bottom: 10px;
