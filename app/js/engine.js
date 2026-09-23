@@ -16,6 +16,8 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
   let lastAppliedY = NaN;
   let dirty = true;
   let urgent = false;
+  let voice = false; // voice glide drives position; auto-scroll stays off
+  let heard = '';
   let lastEmit = 0;
   let emitKey = '';
 
@@ -66,6 +68,7 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
 
   function play() {
     if (playing || countdownEnd) return;
+    if (voice) setVoice(false);
     if (y >= m.total - 1) y = 0;
     if (settings.countdown > 0) {
       countdownEnd = performance.now() + settings.countdown * 1000;
@@ -84,6 +87,17 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
 
   function setSpeed(v) {
     settings.speed = Math.max(1, Math.min(30, Math.round(v * 2) / 2));
+    markDirty(true);
+  }
+
+  let onVoice = null;
+  function setVoice(v) {
+    v = !!v;
+    if (v === voice) return;
+    voice = v;
+    if (v) pause();
+    heard = '';
+    onVoice?.(v);
     markDirty(true);
   }
 
@@ -108,6 +122,8 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
       progress: m.total ? y / m.total : 0,
       remain: pps > 0 ? (m.total - y) / pps : 0,
       scriptId: script?.id || null,
+      voice,
+      heard: voice ? heard : '',
     };
   }
 
@@ -153,7 +169,7 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
     const interval = playing || dragging || seekTarget != null ? 90 : 250;
     if (urgent || (dirty && t - lastEmit > interval) || t - lastEmit > 1500) {
       const s = state();
-      const key = `${s.playing}|${s.counting}|${s.speed}|${s.a.p}|${s.a.f.toFixed(3)}|${s.scriptId}`;
+      const key = `${s.playing}|${s.counting}|${s.speed}|${s.a.p}|${s.a.f.toFixed(3)}|${s.scriptId}|${s.voice}|${s.heard}`;
       if (urgent || key !== emitKey || t - lastEmit > 1500) {
         onState?.(s, urgent);
         emitKey = key;
@@ -174,6 +190,19 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
     get playing() {
       return playing || !!countdownEnd;
     },
+    get voice() {
+      return voice;
+    },
+    setVoice,
+    set onVoice(fn) {
+      onVoice = fn;
+    },
+    setHeard(t) {
+      heard = String(t || '').slice(-60);
+      markDirty();
+    },
+    // voice glide: gentle move so the next words settle at the reading line
+    glideTo: (a) => seekTo(yForAnchor(a, m), 5),
     get y() {
       return y;
     },

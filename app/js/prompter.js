@@ -5,10 +5,11 @@ import { mountControls } from './controls.js';
 import * as lib from './library.js';
 import * as store from './store.js';
 import { keepAwake } from './wakelock.js';
+import { createVoice } from './voice.js';
 
 const $ = (id) => document.getElementById(id);
 
-export function createPrompter({ link, settings, toast, onOpenRemote, onState, onSettings, onSelect }) {
+export function createPrompter({ link, settings, toast, onOpenRemote, onState, onSettings, onSelect, onVoiceStatus }) {
   const view = $('prompter');
   const stage = $('p-stage');
   const hudTop = $('p-top');
@@ -30,6 +31,45 @@ export function createPrompter({ link, settings, toast, onOpenRemote, onState, o
     },
   });
 
+  // ------------------------------------------------------------------ voice glide
+  const heardEl = $('p-heard');
+  const voice = createVoice({
+    onMove: (a) => engine.glideTo(a),
+    onStatus: (s, detail) => {
+      heardEl.dataset.status = s;
+      onVoiceStatus?.(s, detail);
+      if (s === 'blocked' || s === 'unsupported') {
+        engine.setVoice(false);
+        toast((detail || 'Voice glide unavailable') + ' (this phone)');
+      } else if (s === 'listening') heardEl.textContent = 'Listening…';
+      else if (s === 'paused') heardEl.textContent = 'Paused';
+      else if (s === 'starting') heardEl.textContent = 'Starting…';
+      controls.update();
+    },
+    onHeard: (t) => {
+      engine.setHeard(t);
+      heardEl.textContent = t || 'Listening…';
+    },
+  });
+  if (store.NS) window.__voice = voice; // test bench hook
+  engine.onVoice = (on) => {
+    heardEl.hidden = !on;
+    heardEl.textContent = on ? 'Starting…' : '';
+    if (on) {
+      voice.setScript(engine.script?.text);
+      voice.setCursorNear(engine.anchor());
+      voice.enable();
+    } else voice.disable();
+    controls.update();
+  };
+  // After any manual move, point the matcher at the new spot.
+  let resyncTimer = 0;
+  function voiceResync() {
+    if (!engine.voice) return;
+    clearTimeout(resyncTimer);
+    resyncTimer = setTimeout(() => voice.setCursorNear(engine.anchor()), 450);
+  }
+
   // Local controller: the shared control UI talks to the engine directly.
   const ctl = {
     local: true,
@@ -44,10 +84,24 @@ export function createPrompter({ link, settings, toast, onOpenRemote, onState, o
     play: () => engine.play(),
     pause: () => engine.pause(),
     toggle: () => engine.toggle(),
-    top: () => engine.top(),
-    para: (d) => engine.para(d),
-    nudge: (n) => engine.nudge(n),
-    seekAnchor: (a, drag) => engine.seekAnchor(a, drag),
+    top() {
+      engine.top();
+      voiceResync();
+    },
+    para(d) {
+      engine.para(d);
+      voiceResync();
+    },
+    nudge(n) {
+      engine.nudge(n);
+      voiceResync();
+    },
+    seekAnchor(a, drag) {
+      engine.seekAnchor(a, drag);
+      voiceResync();
+    },
+    setVoice: (on) => engine.setVoice(on),
+    voiceInfo: () => ({ supported: voice.supported, on: engine.voice, log: voice.log }),
     setSpeed(v) {
       engine.setSpeed(v);
       store.saveSettings(engine.settings);
@@ -64,6 +118,10 @@ export function createPrompter({ link, settings, toast, onOpenRemote, onState, o
       if (!s) return;
       lib.setActiveId(id);
       engine.setScript(s, { resetPosition: true });
+      if (engine.voice) {
+        voice.setScript(s.text);
+        voice.setCursorNear({ p: 0, f: 0 });
+      }
       if (!fromRemote) onSelect?.(id);
       controls.update();
     },
@@ -105,7 +163,10 @@ export function createPrompter({ link, settings, toast, onOpenRemote, onState, o
   const endPointer = (e) => {
     if (!pDown || e.pointerId !== pDown.id) return;
     const wasTap = !pDown.moved;
-    if (pDown.moved) engine.dragEnd();
+    if (pDown.moved) {
+      engine.dragEnd();
+      voiceResync();
+    }
     pDown = null;
     if (wasTap && e.type === 'pointerup') {
       if (controls.panelOpen) return;
@@ -159,12 +220,18 @@ export function createPrompter({ link, settings, toast, onOpenRemote, onState, o
     ctl,
     controls,
     linkStatus,
+    voiceResync,
     // Called when a script in the library changes (local edit, remote edit or merge).
     scriptChanged(id) {
       if (engine.script && id === engine.script.id) {
         const s = lib.get(id);
-        if (s) engine.setScript(s, { resetPosition: false });
-        else ctl.select(lib.all()[0].id);
+        if (s) {
+          engine.setScript(s, { resetPosition: false });
+          if (engine.voice) {
+            voice.setScript(s.text);
+            voice.setCursorNear(engine.anchor());
+          }
+        } else ctl.select(lib.all()[0].id);
       }
     },
     start() {

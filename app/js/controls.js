@@ -20,6 +20,7 @@ const ICON = {
   flip: '<svg viewBox="0 0 24 24"><path d="M3 12h18M7 8l5-5 5 5M7 16l5 5 5-5"/></svg>',
   more: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg>',
   edit: '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
+  mic: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
 };
 
@@ -35,6 +36,7 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
         <button class="b play" data-a="toggle" aria-label="Play">${ICON.play}</button>
         <button class="b" data-a="fwd" aria-label="Next paragraph">${ICON.fwd}</button>
         <button class="b" data-a="aa" aria-label="Text size">${ICON.aa}</button>
+        <button class="b mic" data-a="voice" aria-label="Voice glide">${ICON.mic}</button>
       </div>
       <div class="bar-row">
         <button class="b sm" data-a="slower" aria-label="Slower">−</button>
@@ -51,6 +53,7 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
   const speedEl = bar.querySelector('[data-speed]');
   const mirrorBtn = bar.querySelector('[data-a=mirror]');
   const flipBtn = bar.querySelector('[data-a=flip]');
+  const micBtn = bar.querySelector('[data-a=voice]');
 
   bar.addEventListener('click', (e) => {
     const b = e.target.closest('[data-a]');
@@ -69,6 +72,13 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
     else if (a === 'mirror') ctl.ready() && ctl.setSetting('mirrorX', !ctl.settings.mirrorX);
     else if (a === 'flip') ctl.ready() && ctl.setSetting('mirrorY', !ctl.settings.mirrorY);
     else if (a === 'aa') togglePop();
+    else if (a === 'voice') {
+      if (!ctl.ready()) return;
+      const next = !ctl.state.voice;
+      micBtn.classList.toggle('on', next);
+      ctl.setVoice(next);
+      if (next) toast(ctl.local ? 'Voice glide on — start reading' : 'Voice glide on (mic on the teleprompter phone)');
+    }
     else if (a === 'edit') openEditor(ctl.state.scriptId);
     else if (a === 'more') openPanel();
   });
@@ -477,6 +487,12 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
       closePanel();
       onOpenRemote?.();
     };
+    if (ctl.voiceInfo) {
+      const info = ctl.voiceInfo();
+      const diag = h(`<section class="set-group-wrap"><div class="set-title">Voice glide diagnostics</div><div class="set-group"><div class="set-row"><div class="set-label"><span>Speech recognition</span><b>${info.supported ? 'available' : 'not available'}</b></div><div class="set-sub">${navigator.userAgent.replace(/^Mozilla\/5\.0 /, '').slice(0, 90)}</div></div><div class="set-row"><pre class="diag"></pre></div></div><p class="muted small pad">If voice glide misbehaves, screenshot this and send it to Claude.</p></section>`);
+      diag.querySelector('pre').textContent = info.log.length ? info.log.slice(-14).join('\n') : 'No voice activity yet this session.';
+      el.appendChild(diag);
+    }
     el.querySelector('[data-newcode]').onclick = () => {
       const c = store.newCode();
       store.setMyCode(c);
@@ -576,6 +592,7 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
     speedEl.textContent = (+st.speed || 0).toFixed(1);
     mirrorBtn.classList.toggle('on', !!st.mirrorX);
     flipBtn.classList.toggle('on', !!st.mirrorY);
+    micBtn.classList.toggle('on', !!s.voice);
     bar.classList.toggle('disabled', !ctl.ready());
     syncWidgets();
     if (!editor.hidden) edStats();
