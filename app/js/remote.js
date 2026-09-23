@@ -49,7 +49,7 @@ export function createRemote({ link, toast, onOpenLocal }) {
     setSetting(key, value) {
       targetSettings[key] = value;
       send({ t: 'setting', key, value });
-      if (['lineHeight', 'align', 'cuePos'].includes(key)) layoutPreview();
+      if (['lineHeight', 'align', 'cuePos', 'fontSize', 'margin'].includes(key)) layoutPreview();
       controls.update();
     },
     setVoice(on) {
@@ -76,13 +76,22 @@ export function createRemote({ link, toast, onOpenLocal }) {
   let pastIdx = -1;
   let raf = 0;
   let lastT = 0;
-  const pvLineH = () => 21 * targetSettings.lineHeight;
+  // The preview is a scaled copy of the teleprompter screen: same font size relative to
+  // the screen width, same margins, so lines wrap identically and "three lines down"
+  // means the same thing on both phones.
+  let pvFont = 21;
+  const pvLineH = () => pvFont * targetSettings.lineHeight;
   const userActive = () => touching || performance.now() - lastUser < 700;
 
   function layoutPreview(keep = true) {
     const a = keep ? anchorAt(displayY, m) : { p: 0, f: 0 };
     const hgt = preview.clientHeight;
     if (!hgt) return;
+    const scale = ps.w ? preview.clientWidth / ps.w : 0;
+    pvFont = scale ? Math.max(8, targetSettings.fontSize * scale) : 21;
+    pv.style.fontSize = pvFont + 'px';
+    const pad = scale ? preview.clientWidth * (targetSettings.margin / 100) : 18;
+    preview.style.paddingLeft = preview.style.paddingRight = Math.round(pad) + 'px';
     padTop.style.height = Math.round(hgt * targetSettings.cuePos) + 'px';
     padBot.style.height = Math.round(hgt * (1 - targetSettings.cuePos)) + 'px';
     pvCue.style.top = Math.round(hgt * targetSettings.cuePos) + 'px';
@@ -204,8 +213,10 @@ export function createRemote({ link, toast, onOpenLocal }) {
     linkStatus,
     onState(msg) {
       const scriptChanged = msg.scriptId !== ps.scriptId;
+      const sizeChanged = msg.w !== ps.w || msg.h !== ps.h;
       ps = msg;
       if (scriptChanged) renderPreview(true);
+      else if (sizeChanged) layoutPreview();
       if (!userActive()) targetY = yForAnchor(msg.a, m);
       $('r-progress').style.width = Math.round((msg.progress || 0) * 1000) / 10 + '%';
       $('r-left').textContent = fmtTime(msg.remain);

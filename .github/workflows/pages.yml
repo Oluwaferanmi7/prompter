@@ -1,10 +1,11 @@
 name: Deploy to GitHub Pages
 
 # main → https://oluwaferanmi7.github.io/prompter/
-# voice branch (if it exists) → https://oluwaferanmi7.github.io/prompter/voice/  (test build)
+# The old /voice/ test path now serves the same build, so phones that installed it
+# keep working and stay up to date.
 on:
   push:
-    branches: [main, voice]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -24,20 +25,11 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: main
-          path: main
-      - uses: actions/checkout@v4
-        with:
-          ref: voice
-          path: voice
-        continue-on-error: true
       - name: Assemble site
         run: |
-          mkdir -p dist
-          cp -r main/app/. dist/
-          if [ -d voice/app ]; then mkdir -p dist/voice && cp -r voice/app/. dist/voice/; fi
-          ls -R dist | head -50
+          mkdir -p dist/voice
+          cp -r app/. dist/
+          cp -r app/. dist/voice/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

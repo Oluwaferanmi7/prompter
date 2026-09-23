@@ -124,6 +124,9 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
       scriptId: script?.id || null,
       voice,
       heard: voice ? heard : '',
+      // screen size so a remote can show a true-to-scale preview
+      w: stage.clientWidth,
+      h: stage.clientHeight,
     };
   }
 
