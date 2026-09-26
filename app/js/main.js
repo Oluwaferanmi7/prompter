@@ -325,14 +325,22 @@ function route() {
   const wantRemote = location.hash.startsWith('#/remote');
   if (wantRemote) remote.enter();
   else remote.leave();
+  // Remember which screen this device was last on, so a remote reopens as a remote.
+  const p = store.getPrefs();
+  if (p.screen !== (wantRemote ? 'remote' : 'local')) {
+    p.screen = wantRemote ? 'remote' : 'local';
+    store.savePrefs(p);
+  }
 }
 window.addEventListener('hashchange', route);
 
 prompter.start();
+if (store.getPrefs().screen === 'remote' && store.getRemoteCode() && !location.hash) history.replaceState(null, '', '#/remote');
 route();
 
-// Cold start lands on Scripts (pick one, or add a new one). Returning from the
-// background doesn't re-run this, so a shoot in progress is never interrupted.
+// Cold start lands on Scripts (pick one, or add a new one) unless this device was being
+// used as a remote. Returning from the background doesn't re-run this, so a shoot in
+// progress is never interrupted.
 if (!location.hash.startsWith('#/remote')) prompter.controls.openPanel('scripts');
 const splash = $('splash');
 splash?.addEventListener('animationend', (e) => e.animationName === 'splash-out' && splash.remove());

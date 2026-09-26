@@ -1308,15 +1308,15 @@ input[type='range']::-moz-range-thumb {
 /* ------------------------------------------------------------------ remote: bigger screens */
 /* Tablet / desktop portrait: keep a comfortable column, but the remote still fills the
    screen (never lets the teleprompter show through at the sides). */
-@media (min-width: 700px) and (min-height: 501px) {
+@media (min-width: 700px) and (min-height: 501px) and (orientation: portrait) {
   .remote {
     padding-left: max(var(--sal), calc((100% - 600px) / 2));
     padding-right: max(var(--sar), calc((100% - 600px) / 2));
   }
 }
-/* Phone on its side: header across the top, preview on the left, controls as a
-   column on the right. */
-@media (orientation: landscape) and (max-height: 500px) {
+/* Phone on its side, or a laptop: header across the top, preview on the left, controls
+   as a column on the right. */
+@media (orientation: landscape) and (max-height: 500px), (orientation: landscape) and (min-width: 900px) {
   .remote {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1473,4 +1473,70 @@ input[type='range']::-moz-range-thumb {
 }
 .panel-foot {
   flex-wrap: wrap;
+}
+
+/* ------------------------------------------------------------------ remote: viewer mode */
+/* Just the words, edge to edge: for the director or a laptop by the camera. */
+.remote.viewer {
+  padding: 0;
+  background: #000;
+}
+.remote.viewer .r-top,
+.remote.viewer .bar {
+  display: none;
+}
+.remote.viewer .preview-wrap {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+.v-corner {
+  display: none;
+}
+.remote.viewer .v-corner {
+  position: absolute;
+  z-index: 6;
+  top: calc(var(--sat) + 10px);
+  right: calc(var(--sar) + 10px);
+  display: flex;
+  gap: 8px;
+  opacity: 0.25;
+  transition: opacity 0.3s;
+}
+.remote.viewer .v-corner.awake {
+  opacity: 1;
+}
+.v-corner button {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(30, 30, 34, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f6f1f1;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* Scripts home: jump to the remote when this device controls another */
+.remote-banner {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--yellow);
+  color: var(--on-yellow);
+  font-family: var(--f-ui);
+  font-size: 15px;
+  font-weight: 600;
+}
+.remote-banner em {
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 1.5px;
 }

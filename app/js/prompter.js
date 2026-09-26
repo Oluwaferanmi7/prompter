@@ -120,7 +120,7 @@ export function createPrompter({ link, log, roster, hub, settings, toast, onOpen
       if (!s) return;
       lib.setActiveId(id);
       engine.setScript(s, { resetPosition: true });
-      log.show(s);
+      log.open(s);
       if (engine.voice) {
         voice.setScript(s.text);
         voice.setCursorNear({ p: 0, f: 0 });
@@ -237,7 +237,7 @@ export function createPrompter({ link, log, roster, hub, settings, toast, onOpen
         const s = lib.get(id);
         if (s) {
           engine.setScript(s, { resetPosition: false });
-          log.show(s, { edited: true });
+          log.edited(s);
           if (engine.voice) {
             voice.setScript(s.text);
             voice.setCursorNear(engine.anchor());
@@ -251,7 +251,7 @@ export function createPrompter({ link, log, roster, hub, settings, toast, onOpen
       const first = (pos && lib.get(pos.id)) || lib.active() || lib.all()[0];
       lib.setActiveId(first.id);
       engine.setScript(first, { resetPosition: true });
-      log.show(first);
+      log.resume(first);
       if (pos && pos.id === first.id) engine.setAnchor(pos.a);
       setBar(store.getPrefs().showBar);
       engine.start();

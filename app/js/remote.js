@@ -99,6 +99,69 @@ export function createRemote({ link, hub, toast, onOpenLocal }) {
   };
   const controls = mountControls({ root: view, ctl, hub, toast });
 
+  // ================================================================ viewer mode
+  // A viewer only watches: no control bar, no header, just the words full screen. A small
+  // corner menu (fades when idle) opens the panel to switch back, plus full screen on
+  // devices that allow it (laptops, not iPhone).
+  const corner = document.createElement('div');
+  corner.className = 'v-corner';
+  corner.innerHTML = `<button data-v="menu" aria-label="Menu">⋯</button>${document.fullscreenEnabled ? '<button data-v="fs" aria-label="Full screen">⤢</button>' : ''}`;
+  view.appendChild(corner);
+  function toggleFullscreen() {
+    try {
+      const p = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+      p?.catch?.(() => {});
+    } catch {}
+  }
+  corner.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-v]');
+    if (!b) return;
+    if (b.dataset.v === 'menu') controls.openPanel('connect');
+    else toggleFullscreen();
+  });
+  let idleTimer = 0;
+  function wake() {
+    corner.classList.add('awake');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => corner.classList.remove('awake'), 3000);
+  }
+  view.addEventListener('pointermove', wake);
+  view.addEventListener('pointerdown', wake);
+  function applyRole() {
+    const viewer = hub.role === 'viewer';
+    if (view.classList.contains('viewer') !== viewer) {
+      view.classList.toggle('viewer', viewer);
+      if (active) requestAnimationFrame(() => layoutPreview());
+    }
+    if (viewer) wake();
+  }
+
+  // ================================================================ keyboard (laptop)
+  document.addEventListener('keydown', (e) => {
+    if (!active || e.target.matches('input, textarea')) return;
+    if (view.querySelector('.sheet:not([hidden]), .modal')) return; // panel or editor open
+    const k = e.key;
+    if (k === 'f' || k === 'F') return toggleFullscreen();
+    const act = {
+      ' ': () => ctl.toggle(),
+      Enter: () => ctl.toggle(),
+      ArrowDown: () => ctl.nudge(1),
+      ArrowUp: () => ctl.nudge(-1),
+      ArrowRight: () => ctl.para(1),
+      PageDown: () => ctl.para(1),
+      ArrowLeft: () => ctl.para(-1),
+      PageUp: () => ctl.para(-1),
+      '+': () => ctl.setSpeed(targetSettings.speed + 0.5),
+      '=': () => ctl.setSpeed(targetSettings.speed + 0.5),
+      '-': () => ctl.setSpeed(targetSettings.speed - 0.5),
+      Home: () => ctl.top(),
+    }[k];
+    if (!act) return;
+    e.preventDefault();
+    if (!inControl()) return blocked() && toast(blocked());
+    act();
+  });
+
   // ================================================================ preview
   let m = { tops: [], heights: [], total: 0, count: 0 };
   let displayY = 0;
@@ -229,6 +292,7 @@ export function createRemote({ link, hub, toast, onOpenLocal }) {
 
   // ================================================================ link
   function linkStatus() {
+    applyRole();
     const t = link.targetStatus;
     if (t !== 'connected') rosterInfo = null;
     const mode = hub.role === 'viewer' ? ' · Viewer' : rosterInfo && !rosterInfo.you.control ? ' · Waiting' : '';

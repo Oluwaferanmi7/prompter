@@ -259,6 +259,15 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
         renderScripts();
       }
     };
+    if (ctl.local && onOpenRemote && ctl.link.targetStatus !== 'idle') {
+      const go = h(`<button class="remote-banner"><span><b>Remote</b> for <em></em></span><span>Open ›</span></button>`);
+      go.querySelector('em').textContent = ctl.link.targetCode;
+      go.onclick = () => {
+        closePanel();
+        onOpenRemote();
+      };
+      body.appendChild(go);
+    }
     const ul = h('<ul class="script-list"></ul>');
     const activeId = ctl.state.scriptId;
     for (const s of lib.all()) {
@@ -343,7 +352,7 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
   async function openLogs() {
     const sheet = h(`<div class="modal"><div class="modal-card logs-card">
       <div class="a-title">Take logs</div>
-      <p class="muted small">${ctl.local ? 'Recorded on this phone' : 'Recorded on the teleprompter phone'} while you shoot: play, pauses, jumps back, speed, voice position and script edits, with times. Drop the file next to the footage for the editor.</p>
+      <p class="muted small">One per script opening, ${ctl.local ? 'recorded on this device' : 'recorded on the teleprompter'}: play, pauses, jumps back, speed, voice position and script edits, with times. Drop the file next to the footage for the editor.</p>
       <ul class="log-list"><li class="muted small">Loading…</li></ul>
       <button class="cancel">Close</button></div></div>`);
     const ul = sheet.querySelector('.log-list');
@@ -359,12 +368,12 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
       return;
     }
     ul.replaceChildren();
-    if (!list.length) ul.appendChild(h('<li class="muted small">No take logs yet. One starts on its own the first time you press play.</li>'));
+    if (!list.length) ul.appendChild(h('<li class="muted small">No take logs yet. One starts on its own when a script is opened and something happens (play, voice glide, a jump or an edit).</li>'));
     for (const meta of list) {
       const d = new Date(meta.started);
       const li = h(`<li><button class="log-item"><div class="si-title"><span></span></div><div class="si-meta"></div><em class="log-go">Share ↗</em></button></li>`);
       li.querySelector('.si-title span').textContent = `${d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} · ${clock(meta.started)}–${clock(meta.ended)}`;
-      li.querySelector('.si-meta').textContent = `${(meta.titles || []).join(', ') || 'No script'} · ${meta.count} events`;
+      li.querySelector('.si-meta').textContent = `${meta.title || 'Untitled'} · ${meta.count} events${meta.closed ? '' : ' · still open'}`;
       const btn = li.querySelector('button');
       const go = li.querySelector('.log-go');
       btn.onclick = async () => {
@@ -373,7 +382,7 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
         try {
           const data = await ctl.logs.get(meta.id);
           if (!data) throw new Error('That log is gone.');
-          const slug = ((meta.titles || [])[0] || 'script').replace(/[^\w-]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+          const slug = (meta.title || 'script').replace(/[^\w-]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
           const name = `takelog-${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}-${slug}.json`;
           btn._file = new File([JSON.stringify(data)], name, { type: 'application/json' });
           if (ctl.local) {
@@ -493,10 +502,10 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
     const el = h(`
       <div class="connect">
         <section class="set-group-wrap">
-          <div class="set-title">This phone</div>
+          <div class="set-title">This device</div>
           <div class="set-group">
             <div class="code-card">
-              <div class="set-sub">Code for controlling this phone</div>
+              <div class="set-sub">Code for controlling this device</div>
               <div class="big-code" data-mycode></div>
               <div class="status-line" data-mystatus></div>
               <button class="btn ghost small" data-newcode>New code</button>
@@ -505,10 +514,10 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
           </div>
         </section>
         <section class="set-group-wrap">
-          <div class="set-title">Control another phone</div>
+          <div class="set-title">Control another device</div>
           <div class="set-group">
             <div class="code-card">
-              <div class="set-sub">Enter the code shown on the other phone</div>
+              <div class="set-sub">Enter the code shown on the other device</div>
               <input class="code-input" maxlength="4" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABCD" data-code>
               <div class="status-line" data-status></div>
               <div class="takeover" data-takeover hidden><span data-who></span><button class="btn primary small" data-take>Take over</button></div>
@@ -520,7 +529,7 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
             </div>
           </div>
         </section>
-        <p class="muted pad small">Both phones need internet to find each other. After that they reconnect on their own.</p>
+        <p class="muted pad small">Both devices need internet to find each other. After that they reconnect on their own.</p>
       </div>`);
     connectEl = el;
     body.appendChild(el);
@@ -532,8 +541,8 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
       })
     );
     mine.lastChild.appendChild(h('<div class="set-sub">With one at a time, another remote taps Take over to switch. Viewers never control.</div>'));
-    other.appendChild(segRow('This phone joins as', 'role', [['remote', 'Remote'], ['viewer', 'Viewer']], () => hub.role, (v) => hub.setRole(v)));
-    other.lastChild.appendChild(h('<div class="set-sub">Viewer: follow the script live without being able to move it.</div>'));
+    other.appendChild(segRow('This device joins as', 'role', [['remote', 'Remote'], ['viewer', 'Viewer']], () => hub.role, (v) => hub.setRole(v)));
+    other.lastChild.appendChild(h('<div class="set-sub">Viewer: just the words, full screen, moving live. For the director or a laptop by the camera.</div>'));
     el.querySelector('[data-take]').onclick = () => hub.takeover();
     const input = el.querySelector('[data-code]');
     input.value = link.targetCode || store.getRemoteCode();
@@ -588,7 +597,7 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
     el.querySelector('[data-mycode]').textContent = link.code;
     const my = el.querySelector('[data-mystatus]');
     my.className = 'status-line ' + (link.host === 'ready' ? (link.hasController ? 'ok' : '') : 'bad');
-    my.textContent = link.hostDetail || (link.host === 'ready' ? (link.hasController ? 'A remote is controlling this phone' : 'Ready — waiting for a remote') : link.host === 'offline' ? 'No internet — retrying…' : 'Getting ready…');
+    my.textContent = link.hostDetail || (link.host === 'ready' ? (link.hasController ? 'Connected' : 'Ready — waiting for a remote') : link.host === 'offline' ? 'No internet — retrying…' : 'Getting ready…');
     const st = el.querySelector('[data-status]');
     const ts = link.targetStatus;
     st.className = 'status-line ' + (ts === 'connected' ? 'ok' : ts === 'notfound' ? 'bad' : '');
@@ -600,12 +609,12 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
     const info = hub.info;
     const waiting = ts === 'connected' && hub.role === 'remote' && info && !info.you.control;
     el.querySelector('[data-takeover]').hidden = !waiting;
-    if (waiting) el.querySelector('[data-who]').textContent = `${info.seat || 'Another phone'} is in control${info.seat && !info.seatOnline ? ' (its phone is asleep)' : ''}`;
+    if (waiting) el.querySelector('[data-who]').textContent = `${info.seat || 'Another device'} is in control${info.seat && !info.seatOnline ? ' (asleep right now)' : ''}`;
     // Phones connected to this phone's teleprompter.
     const box = el.querySelector('[data-phones]');
     const phones = hub.roster();
     box.hidden = !phones.length;
-    box.replaceChildren(h('<div class="set-label"><span>Connected to this phone</span></div>'));
+    box.replaceChildren(h('<div class="set-label"><span>Connected to this device</span></div>'));
     for (const p of phones) {
       const row = h(`<div class="phone-row"><i class="${p.control ? 'on' : ''}"></i><b></b><span></span></div>`);
       row.querySelector('b').textContent = p.code;
@@ -640,7 +649,32 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
     edStats();
     editor.hidden = false;
     fitEditor();
-    setTimeout(() => (focusTitle ? edTitle.select() : edText.focus()), 50);
+    // Start at the line the speaker is on, not the top.
+    const here = id === ctl.state.scriptId ? ctl.state.a?.p || 0 : 0;
+    const lines = edText.value.split('\n');
+    let off = 0;
+    for (let i = 0; i < Math.min(here, lines.length); i++) off += lines[i].length + 1;
+    setTimeout(() => {
+      if (focusTitle) return edTitle.select();
+      edText.focus({ preventScroll: true });
+      edText.setSelectionRange(off, off);
+      edText.scrollTop = Math.max(0, caretY(edText, off) - edText.clientHeight * 0.25);
+    }, 50);
+  }
+  // Pixel offset of a character position inside a textarea (via an invisible copy).
+  function caretY(ta, off) {
+    const cs = getComputedStyle(ta);
+    const m = document.createElement('div');
+    for (const k of ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'paddingTop', 'paddingLeft', 'paddingRight', 'tabSize']) m.style[k] = cs[k];
+    Object.assign(m.style, { position: 'absolute', visibility: 'hidden', left: '-9999px', top: '0', boxSizing: 'border-box', width: ta.clientWidth + 'px', whiteSpace: 'pre-wrap', overflowWrap: 'break-word' });
+    m.textContent = ta.value.slice(0, off);
+    const mark = document.createElement('span');
+    mark.textContent = '\u200b';
+    m.appendChild(mark);
+    document.body.appendChild(m);
+    const y = mark.offsetTop;
+    m.remove();
+    return y;
   }
   function edStats() {
     const w = wordCount(edText.value);

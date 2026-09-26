@@ -8,7 +8,7 @@ A free teleprompter web app (PWA) with phone-to-phone remote control, built for 
 - Any phone can control another: ⋯ → Connect, enter the other phone's 4-character code. Play/pause, speed, jump by paragraph, drag the preview to move the prompter to the exact same spot, font/spacing/mirror/flip, live script editing. Switch between "my teleprompter" and "remote" without disconnecting.
 - Losing the link never touches the script on screen; phones reconnect on their own.
 - Several phones on one teleprompter: each joins as a **Remote** or a **Viewer** (follows along, can't move it). One remote at a time by default, with **Take over** to switch, or allow several.
-- **Take log:** the teleprompter keeps a timestamped record of each session (play/pause, jumps back, speed, voice position, script edits, and who did what) for lining up with the footage in the edit. Scripts → Take logs → Share. Format documented in `app/js/takelog.js`.
+- **Take log:** the teleprompter keeps a timestamped record of each script opening (play/pause, jumps back, speed, voice position, script edits, and who did what) for lining up with the footage in the edit. Scripts → Take logs → Share. Format documented in `app/js/takelog.js`.
 - Script libraries merge between paired phones. No accounts, no backend: phones talk directly over WebRTC ([PeerJS](https://peerjs.com) free signalling + TURN).
 - Voice glide: scroll follows your reading via on-device speech recognition, tolerant of ad-libs.
 - Import scripts from files on the phone (.txt, .md, .docx).
