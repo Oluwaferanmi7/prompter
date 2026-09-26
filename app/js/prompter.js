@@ -9,7 +9,7 @@ import { createVoice } from './voice.js';
 
 const $ = (id) => document.getElementById(id);
 
-export function createPrompter({ link, settings, toast, onOpenRemote, onState, onSettings, onSelect, onVoiceStatus }) {
+export function createPrompter({ link, log, roster, hub, settings, toast, onOpenRemote, onState, onSettings, onSelect, onVoiceStatus }) {
   const view = $('prompter');
   const stage = $('p-stage');
   const hudTop = $('p-top');
@@ -29,7 +29,9 @@ export function createPrompter({ link, settings, toast, onOpenRemote, onState, o
       controls.update();
       if (!s.playing) savePosSoon();
     },
+    onEvent: (type, data) => log.event(type, data),
   });
+  log.settings = () => ({ ...engine.settings });
 
   // ------------------------------------------------------------------ voice glide
   const heardEl = $('p-heard');
@@ -118,17 +120,23 @@ export function createPrompter({ link, settings, toast, onOpenRemote, onState, o
       if (!s) return;
       lib.setActiveId(id);
       engine.setScript(s, { resetPosition: true });
+      log.show(s);
       if (engine.voice) {
         voice.setScript(s.text);
         voice.setCursorNear({ p: 0, f: 0 });
       }
-      if (!fromRemote) onSelect?.(id);
+      onSelect?.(id);
       controls.update();
     },
     onBarPref: (v) => setBar(v),
+    // Take logs recorded on this phone (Scripts → Take logs).
+    logs: {
+      list: async () => log.sessions(),
+      get: async (id) => log.get(id),
+    },
   };
 
-  const controls = mountControls({ root: view, ctl, toast, onOpenRemote });
+  const controls = mountControls({ root: view, ctl, hub, toast, onOpenRemote });
 
   // ------------------------------------------------------------------ bar visibility
   let barTimer = 0;
@@ -211,7 +219,9 @@ export function createPrompter({ link, settings, toast, onOpenRemote, onState, o
     remoteChip.hidden = t === 'idle';
     remoteChip.className = 'chip ' + (t === 'connected' ? 'ok' : t === 'notfound' ? 'bad' : 'wait');
     remoteChip.querySelector('span').textContent = t === 'connected' ? `Remote ${link.targetCode}` : t === 'notfound' ? `${link.targetCode} not found` : `Connecting ${link.targetCode}…`;
-    ctrlDot.hidden = !link.hasController;
+    const n = link.controllerCount;
+    ctrlDot.hidden = !n;
+    ctrlDot.lastChild.textContent = roster.summary();
     controls.update();
   }
 
@@ -227,6 +237,7 @@ export function createPrompter({ link, settings, toast, onOpenRemote, onState, o
         const s = lib.get(id);
         if (s) {
           engine.setScript(s, { resetPosition: false });
+          log.show(s, { edited: true });
           if (engine.voice) {
             voice.setScript(s.text);
             voice.setCursorNear(engine.anchor());
@@ -240,6 +251,7 @@ export function createPrompter({ link, settings, toast, onOpenRemote, onState, o
       const first = (pos && lib.get(pos.id)) || lib.active() || lib.all()[0];
       lib.setActiveId(first.id);
       engine.setScript(first, { resetPosition: true });
+      log.show(first);
       if (pos && pos.id === first.id) engine.setAnchor(pos.a);
       setBar(store.getPrefs().showBar);
       engine.start();

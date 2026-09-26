@@ -7,7 +7,7 @@ import * as store from './store.js';
 
 const $ = (id) => document.getElementById(id);
 
-export function createRemote({ link, toast, onOpenLocal }) {
+export function createRemote({ link, hub, toast, onOpenLocal }) {
   const view = $('remote');
   const preview = $('r-preview');
   const pv = $('r-content');
@@ -19,12 +19,39 @@ export function createRemote({ link, toast, onOpenLocal }) {
   let targetSettings = { ...store.DEFAULT_SETTINGS };
   let ps = { playing: false, counting: 0, speed: 6, a: { p: 0, f: 0 }, progress: 0, remain: NaN, scriptId: null };
   let active = false;
+  // What the teleprompter says about us (null until it does — older app versions never
+  // send it, and then this phone simply has control as before).
+  let rosterInfo = null;
+  const inControl = () => link.connected && hub.role === 'remote' && (rosterInfo ? rosterInfo.you.control : true);
+  // Why the controls are locked while connected, or null.
+  function blocked() {
+    if (!link.connected || inControl()) return null;
+    if (hub.role === 'viewer') return 'Viewer mode — ⋯ → Connect to switch to Remote';
+    return `${rosterInfo?.seat || 'Another phone'} is in control — ⋯ → Connect to take over`;
+  }
+
+  // Replies to requests (take logs) from the teleprompter.
+  const waiting = new Map();
+  function request(msg, replyType, ms = 10000) {
+    return new Promise((resolve, reject) => {
+      if (!link.connected) return reject(new Error('Not connected'));
+      const key = replyType + (msg.id || '');
+      clearTimeout(waiting.get(key)?.timer);
+      const timer = setTimeout(() => {
+        waiting.delete(key);
+        reject(new Error('No answer. Update the app on the teleprompter phone.'));
+      }, ms);
+      waiting.set(key, { resolve, timer });
+      link.send(msg);
+    });
+  }
 
   const send = (msg) => link.send(msg);
   const ctl = {
     local: false,
     link,
-    ready: () => link.connected,
+    ready: inControl,
+    blocked,
     get settings() {
       return targetSettings;
     },
@@ -57,13 +84,20 @@ export function createRemote({ link, toast, onOpenLocal }) {
       send({ t: 'voice', on });
     },
     select(id) {
+      const why = blocked();
+      if (why) return toast(why);
       ps.scriptId = id;
       send({ t: 'select', id });
       renderPreview(true);
       controls.update();
     },
+    // Take logs live on the teleprompter phone; fetch them over the link.
+    logs: {
+      list: () => request({ t: 'getlogs' }, 'logs').then((m) => m.list || []),
+      get: (id) => request({ t: 'getlog', id }, 'log', 30000).then((m) => m.data),
+    },
   };
-  const controls = mountControls({ root: view, ctl, toast });
+  const controls = mountControls({ root: view, ctl, hub, toast });
 
   // ================================================================ preview
   let m = { tops: [], heights: [], total: 0, count: 0 };
@@ -146,6 +180,7 @@ export function createRemote({ link, toast, onOpenLocal }) {
       lastUser = performance.now();
       displayY = targetY = st;
       lastProg = st;
+      if (!inControl()) return;
       const now = performance.now();
       if (now - lastSeekSent > 33) {
         lastSeekSent = now;
@@ -163,6 +198,7 @@ export function createRemote({ link, toast, onOpenLocal }) {
     }
     const para = e.target.closest('.para');
     if (!para || para.classList.contains('blank')) return;
+    if (!inControl()) return;
     const a = { p: +para.dataset.i, f: 0 };
     send({ t: 'seek', a, drag: false });
     targetY = yForAnchor(a, m);
@@ -194,8 +230,10 @@ export function createRemote({ link, toast, onOpenLocal }) {
   // ================================================================ link
   function linkStatus() {
     const t = link.targetStatus;
-    pill.className = 'pill ' + (t === 'connected' ? 'ok' : t === 'idle' ? '' : t === 'notfound' ? 'bad' : 'wait');
-    pill.querySelector('span:last-child').textContent = { idle: 'Not connected', connecting: 'Connecting…', notfound: 'Not found', connected: link.targetCode }[t] || t;
+    if (t !== 'connected') rosterInfo = null;
+    const mode = hub.role === 'viewer' ? ' · Viewer' : rosterInfo && !rosterInfo.you.control ? ' · Waiting' : '';
+    pill.className = 'pill ' + (t === 'connected' ? (mode ? 'view' : 'ok') : t === 'idle' ? '' : t === 'notfound' ? 'bad' : 'wait');
+    pill.querySelector('span:last-child').textContent = { idle: 'Not connected', connecting: 'Connecting…', notfound: 'Not found', connected: link.targetCode + mode }[t] || t;
     if (t !== 'connected') {
       ps = { ...ps, playing: false, counting: 0 };
       if (active && t === 'idle') renderPreview(true);
@@ -211,6 +249,28 @@ export function createRemote({ link, toast, onOpenLocal }) {
     ctl,
     controls,
     linkStatus,
+    get rosterInfo() {
+      return rosterInfo;
+    },
+    onRoster(msg) {
+      const had = rosterInfo;
+      const was = inControl();
+      rosterInfo = msg;
+      const now = inControl();
+      if (hub.role === 'remote' && was !== now) {
+        if (now) toast(had ? 'You have control' : 'Connected: you have control');
+        else toast(`${msg.seat || 'Another phone'} ${had ? 'took control' : 'is in control'}`);
+      }
+      linkStatus();
+    },
+    onReply(msg) {
+      const key = msg.t + (msg.id || '');
+      const w = waiting.get(key);
+      if (!w) return;
+      clearTimeout(w.timer);
+      waiting.delete(key);
+      w.resolve(msg);
+    },
     onState(msg) {
       const scriptChanged = msg.scriptId !== ps.scriptId;
       const sizeChanged = msg.w !== ps.w || msg.h !== ps.h;

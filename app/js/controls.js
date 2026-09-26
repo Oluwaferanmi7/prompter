@@ -24,8 +24,14 @@ const ICON = {
   close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
 };
 
-export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
-  const prefs = store.getPrefs();
+export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
+  // Connected but not allowed to drive (viewer, or another remote has control)?
+  // Returns the reason and shows it; null when free to act.
+  function locked() {
+    const why = ctl.blocked?.();
+    if (why) toast(why);
+    return why;
+  }
 
   // ------------------------------------------------------------------ bar
   const bar = h(`
@@ -60,6 +66,7 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
     if (!b) return;
     e.stopPropagation();
     const a = b.dataset.a;
+    if (a !== 'more' && locked()) return;
     if (a === 'toggle') {
       if (!ctl.ready()) return;
       playBtn.classList.toggle('playing', !ctl.state.playing);
@@ -87,7 +94,7 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
   let pop = null;
   function togglePop() {
     if (pop) return closePop();
-    if (!ctl.ready()) return;
+    if (locked() || !ctl.ready()) return;
     pop = h('<div class="pop"></div>');
     pop.append(
       slider('Font size', 'fontSize', 20, 160, 2, (v) => v + 'px'),
@@ -224,6 +231,7 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
     body.replaceChildren();
     const head = h(`<div class="panel-head"><span class="muted">${ctl.local ? 'Tap a script to open the teleprompter' : 'Tap a script to send it to the teleprompter'}</span><span class="head-btns"><label class="btn ghost small">Import<input type="file" accept="${ACCEPT}" multiple hidden></label><button class="btn primary small">+ New</button></span></div>`);
     head.querySelector('button').onclick = () => {
+      if (locked()) return;
       const s = lib.create();
       ctl.select(s.id);
       openEditor(s.id, true);
@@ -231,6 +239,7 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
     head.querySelector('input[type=file]').onchange = async (e) => {
       const files = [...(e.target.files || [])];
       e.target.value = '';
+      if (locked()) return;
       const made = [];
       for (const f of files) {
         try {
@@ -267,7 +276,8 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
       li.querySelector('.si-more').onclick = () => scriptActions(s);
       ul.appendChild(li);
     }
-    const foot = h(`<div class="panel-foot"><button class="btn ghost small" data-export>Back up scripts</button><label class="btn ghost small">Restore<input type="file" accept=".json,application/json" hidden></label></div>`);
+    const foot = h(`<div class="panel-foot"><button class="btn ghost small" data-logs>Take logs</button><button class="btn ghost small" data-export>Back up scripts</button><label class="btn ghost small">Restore<input type="file" accept=".json,application/json" hidden></label></div>`);
+    foot.querySelector('[data-logs]').onclick = openLogs;
     foot.querySelector('[data-export]').onclick = exportScripts;
     foot.querySelector('input').onchange = importScripts;
     body.append(head, ul, foot);
@@ -312,9 +322,12 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
   async function exportScripts() {
     const data = JSON.stringify({ app: 'lim-prompter', version: 2, exported: new Date().toISOString(), scripts: lib.all() }, null, 2);
     const name = `prompter-scripts-${new Date().toISOString().slice(0, 10)}.json`;
-    const file = new File([data], name, { type: 'application/json' });
+    await shareFile(new File([data], name, { type: 'application/json' }), 'Prompter scripts');
+  }
+  // Share sheet (AirDrop, Files, Drive…) where available, else a download.
+  async function shareFile(file, title) {
     try {
-      if (navigator.canShare?.({ files: [file] })) return await navigator.share({ files: [file], title: 'Prompter scripts' });
+      if (navigator.canShare?.({ files: [file] })) return await navigator.share({ files: [file], title });
     } catch (err) {
       if (err?.name === 'AbortError') return;
     }
@@ -324,6 +337,58 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   }
+  // ---- take logs (recorded on the teleprompter phone; see takelog.js)
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const clock = (t) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  async function openLogs() {
+    const sheet = h(`<div class="modal"><div class="modal-card logs-card">
+      <div class="a-title">Take logs</div>
+      <p class="muted small">${ctl.local ? 'Recorded on this phone' : 'Recorded on the teleprompter phone'} while you shoot: play, pauses, jumps back, speed, voice position and script edits, with times. Drop the file next to the footage for the editor.</p>
+      <ul class="log-list"><li class="muted small">Loading…</li></ul>
+      <button class="cancel">Close</button></div></div>`);
+    const ul = sheet.querySelector('.log-list');
+    sheet.querySelector('.cancel').onclick = () => sheet.remove();
+    sheet.addEventListener('click', (e) => e.target === sheet && sheet.remove());
+    root.appendChild(sheet);
+    let list;
+    try {
+      list = await ctl.logs.list();
+    } catch (err) {
+      ul.replaceChildren(h(`<li class="muted small"></li>`));
+      ul.firstChild.textContent = err?.message || "Couldn't load the logs.";
+      return;
+    }
+    ul.replaceChildren();
+    if (!list.length) ul.appendChild(h('<li class="muted small">No take logs yet. One starts on its own the first time you press play.</li>'));
+    for (const meta of list) {
+      const d = new Date(meta.started);
+      const li = h(`<li><button class="log-item"><div class="si-title"><span></span></div><div class="si-meta"></div><em class="log-go">Share ↗</em></button></li>`);
+      li.querySelector('.si-title span').textContent = `${d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} · ${clock(meta.started)}–${clock(meta.ended)}`;
+      li.querySelector('.si-meta').textContent = `${(meta.titles || []).join(', ') || 'No script'} · ${meta.count} events`;
+      const btn = li.querySelector('button');
+      const go = li.querySelector('.log-go');
+      btn.onclick = async () => {
+        if (btn._file) return shareFile(btn._file, 'Take log');
+        go.textContent = 'Preparing…';
+        try {
+          const data = await ctl.logs.get(meta.id);
+          if (!data) throw new Error('That log is gone.');
+          const slug = ((meta.titles || [])[0] || 'script').replace(/[^\w-]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+          const name = `takelog-${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}-${slug}.json`;
+          btn._file = new File([JSON.stringify(data)], name, { type: 'application/json' });
+          if (ctl.local) {
+            go.textContent = 'Share ↗';
+            shareFile(btn._file, 'Take log');
+          } else go.textContent = 'Ready: tap to share ↗'; // a fetch over the link outlives the tap
+        } catch (err) {
+          go.textContent = 'Share ↗';
+          toast(err?.message || "Couldn't get that log");
+        }
+      };
+      ul.appendChild(li);
+    }
+  }
+
   async function importScripts(e) {
     const f = e.target.files?.[0];
     e.target.value = '';
@@ -341,7 +406,9 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
   // ---- display
   function renderDisplay() {
     if (!ctl.ready()) {
-      body.appendChild(h('<p class="muted pad">Connect to a teleprompter first.</p>'));
+      const p = h('<p class="muted pad"></p>');
+      p.textContent = ctl.blocked?.() || 'Connect to a teleprompter first.';
+      body.appendChild(p);
       return;
     }
     body.append(
@@ -434,6 +501,7 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
               <div class="status-line" data-mystatus></div>
               <button class="btn ghost small" data-newcode>New code</button>
             </div>
+            <div class="set-row phones" data-phones hidden></div>
           </div>
         </section>
         <section class="set-group-wrap">
@@ -443,6 +511,7 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
               <div class="set-sub">Enter the code shown on the other phone</div>
               <input class="code-input" maxlength="4" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABCD" data-code>
               <div class="status-line" data-status></div>
+              <div class="takeover" data-takeover hidden><span data-who></span><button class="btn primary small" data-take>Take over</button></div>
               <div class="row-btns">
                 <button class="btn primary" data-connect>Connect</button>
                 <button class="btn ghost" data-disconnect hidden>Disconnect</button>
@@ -455,6 +524,17 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
       </div>`);
     connectEl = el;
     body.appendChild(el);
+    const [mine, other] = el.querySelectorAll('.set-group');
+    mine.appendChild(
+      segRow('Remotes', 'multi', [[false, 'One at a time'], [true, 'Several']], () => hub.multi, (v) => {
+        hub.setMulti(v);
+        toast(v ? 'Every remote can control this phone' : 'One remote at a time — others can take over');
+      })
+    );
+    mine.lastChild.appendChild(h('<div class="set-sub">With one at a time, another remote taps Take over to switch. Viewers never control.</div>'));
+    other.appendChild(segRow('This phone joins as', 'role', [['remote', 'Remote'], ['viewer', 'Viewer']], () => hub.role, (v) => hub.setRole(v)));
+    other.lastChild.appendChild(h('<div class="set-sub">Viewer: follow the script live without being able to move it.</div>'));
+    el.querySelector('[data-take]').onclick = () => hub.takeover();
     const input = el.querySelector('[data-code]');
     input.value = link.targetCode || store.getRemoteCode();
     const go = () => {
@@ -516,6 +596,22 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
     el.querySelector('[data-connect]').hidden = ts !== 'idle';
     el.querySelector('[data-disconnect]').hidden = ts === 'idle';
     el.querySelector('[data-open]').hidden = ts !== 'connected' || !onOpenRemote;
+    // Waiting for control?
+    const info = hub.info;
+    const waiting = ts === 'connected' && hub.role === 'remote' && info && !info.you.control;
+    el.querySelector('[data-takeover]').hidden = !waiting;
+    if (waiting) el.querySelector('[data-who]').textContent = `${info.seat || 'Another phone'} is in control${info.seat && !info.seatOnline ? ' (its phone is asleep)' : ''}`;
+    // Phones connected to this phone's teleprompter.
+    const box = el.querySelector('[data-phones]');
+    const phones = hub.roster();
+    box.hidden = !phones.length;
+    box.replaceChildren(h('<div class="set-label"><span>Connected to this phone</span></div>'));
+    for (const p of phones) {
+      const row = h(`<div class="phone-row"><i class="${p.control ? 'on' : ''}"></i><b></b><span></span></div>`);
+      row.querySelector('b').textContent = p.code;
+      row.querySelector('span').textContent = p.role === 'viewer' ? 'Viewer' : p.control ? 'Remote · in control' : 'Remote · waiting';
+      box.appendChild(row);
+    }
   }
 
   // ------------------------------------------------------------------ editor
@@ -535,6 +631,7 @@ export function mountControls({ root, ctl, toast, onOpenRemote, onOpenLocal }) {
   let liveTimer = 0;
 
   function openEditor(id, focusTitle) {
+    if (locked()) return;
     const s = lib.get(id);
     if (!s) return;
     editingId = id;

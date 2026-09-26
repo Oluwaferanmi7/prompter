@@ -2,7 +2,7 @@
 // the play/seek state. Runs on every phone. Remotes send it commands; it reports state.
 import { renderScript, measure, anchorAt, yForAnchor, paraStep, THEMES } from './render.js';
 
-export function createEngine({ view, stage, scroller, content, cue, countEl, settings, onState }) {
+export function createEngine({ view, stage, scroller, content, cue, countEl, settings, onState, onEvent }) {
   let script = null;
   let m = { tops: [], heights: [], total: 0, count: 0 };
   let y = 0;
@@ -20,6 +20,10 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
   let heard = '';
   let lastEmit = 0;
   let emitKey = '';
+  let lastPosLog = 0;
+  let dragFrom = null;
+  let wasMoving = false;
+  const ev = (type, data) => onEvent?.(type, data);
 
   const cueY = () => stage.clientHeight * settings.cuePos;
   const lineH = () => settings.fontSize * settings.lineHeight;
@@ -70,14 +74,19 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
     if (playing || countdownEnd) return;
     if (voice) setVoice(false);
     if (y >= m.total - 1) y = 0;
+    ev('play', { countdown: settings.countdown > 0 ? settings.countdown : 0 });
     if (settings.countdown > 0) {
       countdownEnd = performance.now() + settings.countdown * 1000;
       countEl.hidden = false;
       countEl.textContent = settings.countdown;
-    } else playing = true;
+    } else {
+      playing = true;
+      ev('rolling');
+    }
     markDirty(true);
   }
   function pause() {
+    if (playing || countdownEnd) ev('pause', { a: anchorAt(y, m) });
     playing = false;
     countdownEnd = 0;
     countEl.hidden = true;
@@ -86,7 +95,9 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
   const toggle = () => (playing || countdownEnd ? pause() : play());
 
   function setSpeed(v) {
-    settings.speed = Math.max(1, Math.min(30, Math.round(v * 2) / 2));
+    const next = Math.max(1, Math.min(30, Math.round(v * 2) / 2));
+    if (next !== settings.speed) ev('speed', { v: next });
+    settings.speed = next;
     markDirty(true);
   }
 
@@ -95,10 +106,18 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
     v = !!v;
     if (v === voice) return;
     voice = v;
+    ev('voice', { on: v });
     if (v) pause();
     heard = '';
     onVoice?.(v);
     markDirty(true);
+  }
+
+  // Manual moves are logged as jumps (voice glide moves are not; positions cover those).
+  function jump(kind, target, rate) {
+    const from = anchorAt(seekTarget ?? y, m);
+    seekTo(target, rate);
+    ev('jump', { kind, from, to: anchorAt(seekTarget, m) });
   }
 
   function seekTo(target, rate = 12) {
@@ -141,6 +160,7 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
         countdownEnd = 0;
         countEl.hidden = true;
         playing = true;
+        ev('rolling');
         markDirty(true);
       } else if (countEl.textContent !== String(left)) {
         countEl.textContent = left;
@@ -161,7 +181,18 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
       }
     }
     y = clampY(y);
-    if (playing && y >= m.total && seekTarget == null) pause();
+    if (playing && y >= m.total && seekTarget == null) {
+      ev('end');
+      pause();
+    }
+
+    // Position trail for the take log: ~1/s while anything is moving, plus where it stopped.
+    const moving = playing || dragging || seekTarget != null || voice;
+    if ((moving && t - lastPosLog > 1000) || (!moving && wasMoving)) {
+      lastPosLog = t;
+      ev('pos', { a: anchorAt(y, m) });
+    }
+    wasMoving = moving;
 
     if (y !== lastAppliedY) {
       scroller.style.transform = `translate3d(0, ${(cueY() - y).toFixed(2)}px, 0)`;
@@ -202,6 +233,7 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
     },
     setHeard(t) {
       heard = String(t || '').slice(-60);
+      ev('heard', { text: t });
       markDirty();
     },
     // voice glide: gentle move so the next words settle at the reading line
@@ -217,26 +249,28 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
     pause,
     toggle,
     setSpeed,
-    seekAnchor: (a, drag) => seekTo(yForAnchor(a, m), drag ? 28 : 10),
+    seekAnchor: (a, drag) => jump(drag ? 'drag' : 'tap', yForAnchor(a, m), drag ? 28 : 10),
     setAnchor(a) {
       y = clampY(yForAnchor(a, m));
       seekTarget = null;
       markDirty(true);
     },
-    para: (dir) => seekTo(paraStep(seekTarget ?? y, m, content, dir), 9),
-    nudge: (lines) => seekTo((seekTarget ?? y) + lines * lineH(), 12),
+    para: (dir) => jump('para', paraStep(seekTarget ?? y, m, content, dir), 9),
+    nudge: (lines) => jump('nudge', (seekTarget ?? y) + lines * lineH(), 12),
     top() {
       pause();
-      seekTo(0, 9);
+      jump('top', 0, 9);
     },
     // direct drag on the stage
     dragStart() {
       dragging = true;
       seekTarget = null;
+      dragFrom = anchorAt(y, m);
       return y;
     },
     dragTo(v) {
       y = clampY(v);
+      ev('jump', { kind: 'drag', from: dragFrom, to: anchorAt(y, m) });
       markDirty();
     },
     dragEnd() {

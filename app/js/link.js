@@ -1,7 +1,8 @@
 // Device-to-device link over WebRTC (PeerJS; free public signalling + TURN, no account).
 //
 // Every phone is a teleprompter and registers under its own code so any other phone can
-// dial it. A phone that dials another becomes that phone's remote. Both directions
+// dial it. Any number of phones can dial the same teleprompter (as remotes or viewers);
+// each inbound connection is keyed by the dialling phone's code. Both directions
 // self-heal: iOS drops sockets whenever the screen locks or the app is backgrounded, so
 // everything assumes connections die and quietly reconnects. Losing the link never
 // changes what the teleprompter is showing.
@@ -13,15 +14,14 @@ const peerOptions = () => ({ debug: 1, pingInterval: 4000 });
 export class Link {
   constructor({ code, onMessage, onStatus, onControllerChange, onOpen }) {
     this.code = code;
-    this.onMessage = onMessage; // (msg, from: 'controller' | 'target')
+    this.onMessage = onMessage; // (msg, from: 'controller' | 'target', code of the controller)
     this.onStatus = onStatus; // ({ host, target })
-    this.onControllerChange = onControllerChange;
+    this.onControllerChange = onControllerChange; // (attached: boolean, code)
     this.onOpen = onOpen; // outbound connection opened
     this.peer = null;
     this.host = 'starting'; // starting | ready | offline
     this.hostDetail = '';
-    this.controller = null; // inbound connection (someone controls us)
-    this.ctrlRx = 0;
+    this.controllers = new Map(); // code -> { conn, rx } — phones connected to us
     this.targetCode = '';
     this.target = null; // outbound connection (we control someone)
     this.targetStatus = 'idle'; // idle | connecting | notfound | connected
@@ -38,7 +38,7 @@ export class Link {
   }
 
   _status() {
-    this.onStatus?.({ host: this.host, hostDetail: this.hostDetail, target: this.targetStatus, controller: !!this.controller?.open });
+    this.onStatus?.({ host: this.host, hostDetail: this.hostDetail, target: this.targetStatus, controllers: this.controllerCount });
   }
 
   // ------------------------------------------------------------- peer (our identity)
@@ -117,53 +117,83 @@ export class Link {
 
   changeCode(code) {
     this.code = code;
-    if (this.controller) {
-      try {
-        this.controller.close();
-      } catch {}
-      this.controller = null;
-    }
+    for (const code of [...this.controllers.keys()]) this._dropController(code);
     this._build();
   }
 
   // ------------------------------------------------------------- inbound (we are controlled)
   _accept(c) {
-    if (this.controller && this.controller !== c) {
+    const code = String(c.peer || '').replace(PREFIX, '') || c.connectionId;
+    const prev = this.controllers.get(code);
+    if (prev && prev.conn !== c) {
+      // Same phone redialled (it reloaded or lost the socket): the new connection wins.
+      prev.conn.removeAllListeners?.();
       try {
-        this.controller.close();
+        prev.conn.close();
       } catch {}
     }
-    this.controller = c;
+    const entry = { conn: c, rx: Date.now() };
+    this.controllers.set(code, entry);
+    const mine = () => this.controllers.get(code) === entry;
     c.on('open', () => {
-      if (this.controller !== c) return;
-      this.ctrlRx = Date.now();
-      this.onControllerChange?.(true);
+      if (!mine()) return;
+      entry.rx = Date.now();
+      this.onControllerChange?.(true, code);
       this._status();
     });
     c.on('data', (msg) => {
-      if (this.controller !== c) return;
-      this.ctrlRx = Date.now();
-      if (msg?.t === 'ping') return this.sendToController({ t: 'pong', ts: msg.ts });
-      this.onMessage?.(msg, 'controller');
+      if (!mine()) return;
+      entry.rx = Date.now();
+      if (msg?.t === 'ping') return this.sendTo(code, { t: 'pong', ts: msg.ts });
+      this.onMessage?.(msg, 'controller', code);
     });
     const gone = () => {
-      if (this.controller !== c) return;
-      this.controller = null;
-      this.onControllerChange?.(false);
+      if (!mine()) return;
+      this.controllers.delete(code);
+      this.onControllerChange?.(false, code);
       this._status();
     };
     c.on('close', gone);
     c.on('error', gone);
   }
 
-  get hasController() {
-    return !!this.controller?.open;
+  _dropController(code) {
+    const e = this.controllers.get(code);
+    if (!e) return;
+    this.controllers.delete(code);
+    try {
+      e.conn.close();
+    } catch {}
+    this.onControllerChange?.(false, code);
+    this._status();
   }
 
-  sendToController(msg) {
-    if (this.controller?.open) {
+  // Codes of phones currently connected to us.
+  get controllerCodes() {
+    return [...this.controllers].filter(([, e]) => e.conn.open).map(([code]) => code);
+  }
+  get controllerCount() {
+    return this.controllerCodes.length;
+  }
+  get hasController() {
+    return this.controllerCount > 0;
+  }
+
+  sendTo(code, msg) {
+    const c = this.controllers.get(code)?.conn;
+    if (c?.open) {
       try {
-        this.controller.send(msg);
+        c.send(msg);
+      } catch {}
+    }
+  }
+
+  // To every connected phone (optionally except one).
+  sendToController(msg, except) {
+    for (const [code, e] of this.controllers) {
+      if (code === except || !e.conn.open) continue;
+      try {
+        e.conn.send(msg);
       } catch {}
     }
   }
@@ -276,14 +306,9 @@ export class Link {
         this._retryDial(200);
       }
     }
-    if (this.controller?.open && Date.now() - this.ctrlRx > 9000) {
-      // Controller went quiet (locked phone, walked away). Drop it; it will redial.
-      try {
-        this.controller.close();
-      } catch {}
-      this.controller = null;
-      this.onControllerChange?.(false);
-      this._status();
+    for (const [code, e] of this.controllers) {
+      // A phone went quiet (locked, walked away). Drop it; it will redial.
+      if (Date.now() - e.rx > 9000) this._dropController(code);
     }
   }
 }

@@ -1305,9 +1305,172 @@ input[type='range']::-moz-range-thumb {
   text-align: center;
 }
 
-@media (min-width: 700px) {
+/* ------------------------------------------------------------------ remote: bigger screens */
+/* Tablet / desktop portrait: keep a comfortable column, but the remote still fills the
+   screen (never lets the teleprompter show through at the sides). */
+@media (min-width: 700px) and (min-height: 501px) {
   .remote {
-    max-width: 600px;
-    margin: 0 auto;
+    padding-left: max(var(--sal), calc((100% - 600px) / 2));
+    padding-right: max(var(--sar), calc((100% - 600px) / 2));
   }
+}
+/* Phone on its side: header across the top, preview on the left, controls as a
+   column on the right. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .remote {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .remote .r-top {
+    grid-column: 1 / -1;
+    padding-top: calc(var(--sat) + 4px);
+    padding-bottom: 4px;
+  }
+  .remote .preview-wrap {
+    grid-column: 1;
+    grid-row: 2;
+    margin: 0 8px calc(var(--sab) + 8px) 12px;
+  }
+  .remote .bar {
+    grid-column: 2;
+    grid-row: 2;
+    width: 250px;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    align-content: stretch;
+    gap: 8px;
+    margin: 0 12px calc(var(--sab) + 8px) 0;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+  }
+  .remote .bar-row {
+    flex-wrap: wrap;
+  }
+  .remote .b {
+    min-width: 44px;
+    height: 44px;
+  }
+  .remote .b.tog span {
+    display: none;
+  }
+  /* Aa opens beside the column, over the preview */
+  .remote .pop {
+    left: auto;
+    right: calc(100% + 10px);
+    top: auto;
+    bottom: 0;
+    width: min(360px, 50vw);
+    margin: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ several phones */
+.pill.view .dot {
+  background: #7aa7ff;
+}
+.takeover {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+.takeover[hidden] {
+  display: none;
+}
+.phones .phone-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0 0;
+  font-family: var(--f-ui);
+  font-size: 14px;
+}
+.phones .phone-row b {
+  letter-spacing: 2px;
+}
+.phones .phone-row span {
+  color: var(--muted);
+}
+.phones .phone-row i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.phones .phone-row i.on {
+  background: var(--ok);
+  box-shadow: 0 0 8px var(--ok);
+}
+
+/* take logs */
+.logs-card {
+  max-height: calc(100% - 24px);
+}
+.logs-card .a-title {
+  font-family: var(--f-head);
+  font-size: 20px;
+  font-weight: 700;
+  padding: 10px 10px 2px;
+}
+.logs-card > p {
+  margin: 0;
+  padding: 0 10px 8px;
+}
+.log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+.log-list > li.muted {
+  padding: 12px 10px;
+}
+.log-item {
+  width: 100%;
+  text-align: left;
+  padding: 12px;
+  border-radius: 12px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 10px;
+}
+.log-item:active {
+  background: var(--surface-2);
+}
+.log-item .si-meta {
+  grid-column: 1;
+  margin-top: 3px;
+}
+.log-go {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-style: normal;
+  font-family: var(--f-ui);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--yellow);
+}
+.logs-card .cancel {
+  flex: none;
+  height: 48px;
+  border-radius: 12px;
+  font-weight: 600;
+  background: var(--surface-2);
+  color: var(--text);
+}
+.panel-foot {
+  flex-wrap: wrap;
 }

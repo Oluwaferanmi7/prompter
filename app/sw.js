@@ -1,6 +1,6 @@
 // Offline cache for the app shell. Stale-while-revalidate: opens instantly (even with
 // no signal on set), fetches updates in the background for the next launch.
-const VERSION = 'prompter-v7';
+const VERSION = 'prompter-v8';
 const SHELL = [
   './',
   'index.html',
@@ -17,6 +17,7 @@ const SHELL = [
   'js/render.js',
   'js/store.js',
   'js/voice.js',
+  'js/takelog.js',
   'js/wakelock.js',
   'vendor/peerjs.min.js',
   'vendor/nosleep-media.js',
