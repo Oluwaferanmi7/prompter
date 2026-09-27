@@ -12,10 +12,10 @@
     "APP_ORIGINS": "https://oluwaferanmi7.github.io,http://localhost:5173"
   },
   "d1_databases": [
-    { "binding": "DB", "database_name": "prompter", "database_id": "REPLACE_AFTER_wrangler_d1_create" }
+    { "binding": "DB", "database_name": "prompter", "database_id": "3d5d3a74-ecf2-4872-8a1e-921bec6035a5" }
   ],
   "kv_namespaces": [
-    { "binding": "OAUTH_KV", "id": "REPLACE_AFTER_wrangler_kv_namespace_create" }
+    { "binding": "OAUTH_KV", "id": "519ca1de6f474a418a1cb1c2317a1f00" }
   ],
   "observability": { "enabled": true }
 }
