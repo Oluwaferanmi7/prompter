@@ -34,10 +34,9 @@ async function claudeConnect(email) {
   const page = await fetch(`${BASE}/authorize?${q}`);
   const html = await page.text();
   const nonce = /name="n" value="([^"]+)"/.exec(html)?.[1];
-  const cookie = (page.headers.get('set-cookie') || '').split(';')[0];
-  // Forged post without the cookie must fail.
-  const forged = await fetch(`${BASE}/authorize`, { method: 'POST', body: new URLSearchParams({ n: nonce, dev: email }), redirect: 'manual' });
-  const approve = await fetch(`${BASE}/authorize`, { method: 'POST', headers: { cookie }, body: new URLSearchParams({ n: nonce, dev: email }), redirect: 'manual' });
+  // A post from another site must fail; one from the page itself goes through.
+  const forged = await fetch(`${BASE}/authorize`, { method: 'POST', headers: { origin: 'https://evil.example' }, body: new URLSearchParams({ n: nonce, dev: email }), redirect: 'manual' });
+  const approve = await fetch(`${BASE}/authorize`, { method: 'POST', headers: { origin: BASE }, body: new URLSearchParams({ n: nonce, dev: email }), redirect: 'manual' });
   const back = new URL(approve.headers.get('location'));
   const tok = await fetch(`${BASE}/token`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'authorization_code', code: back.searchParams.get('code'), redirect_uri: redirect, client_id: reg.client_id, code_verifier: verifier, resource: `${BASE}/mcp` }) }).then((r) => r.json());
   return { reg, html, forgedStatus: forged.status, back, token: tok.access_token, tok };
@@ -69,7 +68,7 @@ ok((await api('nope', '/api/me')).status === 401, 'bad token is rejected');
 const c = await claudeConnect('feranmi@example.com');
 ok(!!c.reg.client_id, 'Claude-style client registers');
 ok(c.html.includes('Connect <b>Claude</b>'), 'approval page names the app');
-ok(c.forgedStatus === 400, 'approval without the page cookie is refused');
+ok(c.forgedStatus === 403, 'approval posted from another site is refused');
 ok(c.back.searchParams.get('state') === 'xyz' && !!c.back.searchParams.get('code'), 'approval returns to Claude with a code');
 ok(!!c.token, 'code + PKCE trades for an access token');
 const noauth = await fetch(`${BASE}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' });

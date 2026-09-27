@@ -5,7 +5,7 @@ import * as lib from './library.js';
 
 const GOOGLE_AUTH = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN = 'https://oauth2.googleapis.com/token';
-const TTL = 600; // seconds a login may take
+const TTL = 1800; // seconds a login may take
 
 // ------------------------------------------------------------------ helpers
 const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json', ...headers } });
@@ -171,7 +171,7 @@ export const appHandler = {
       // ---------------- Google comes back here for both flows
       if (path === '/google/callback') {
         const flow = await kvTake(env, 'state:' + (url.searchParams.get('state') || ''));
-        if (!flow) return page('Sign-in', '<h1>Sign-in expired</h1><p>Please go back and try again.</p>', 400);
+        if (!flow) return page('Sign-in', '<h1>Google sign-in timed out</h1><p>Step 2 of 2. Go back and start the sign-in again.</p>', 400);
         const code = url.searchParams.get('code');
         if (!code) return page('Sign-in', '<h1>Sign-in cancelled</h1><p>You can close this and try again.</p>', 400);
         return finishLogin(env, url, flow, await googleProfile(env, url, code));
@@ -210,18 +210,18 @@ export const appHandler = {
            <p>Next you'll sign in with Google, so it only ever reaches <b>your</b> library.</p>
            <form method="post" action="/authorize"><input type="hidden" name="n" value="${nonce}">${devBox}<button>Continue with Google</button></form>
            <small>Returns to ${esc(host)}</small>`,
-          200,
-          // The approval must be clicked on this page: the form nonce has to match this cookie,
-          // which a cross-site form post can't send (SameSite=Lax).
-          { 'set-cookie': `lp_approve=${nonce}; Path=/authorize; Max-Age=${TTL}; HttpOnly; Secure; SameSite=Lax` }
+          200
         );
       }
       if (path === '/authorize' && request.method === 'POST') {
+        // The approval must be clicked on this page, not posted from another site: browsers
+        // stamp form posts with the page's origin, which another site can't fake.
+        const from = request.headers.get('origin') || (request.headers.get('referer') ? new URL(request.headers.get('referer')).origin : '');
+        if (from !== url.origin) return page('Connect', "<h1>Can't approve from here</h1><p>Go back to Claude and click Connect again.</p>", 403);
         const form = await request.formData();
         const nonce = String(form.get('n') || '');
-        const cookie = /(?:^|;\s*)lp_approve=([^;]+)/.exec(request.headers.get('cookie') || '')?.[1];
-        const saved = nonce && cookie === nonce ? await kvTake(env, 'approve:' + nonce) : null;
-        if (!saved) return page('Connect', '<h1>That request expired</h1><p>Go back to Claude and try connecting again.</p>', 400);
+        const saved = nonce ? await kvTake(env, 'approve:' + nonce) : null;
+        if (!saved) return page('Connect', '<h1>This approval page expired</h1><p>Step 1 of 2. Go back to Claude and click Connect again.</p>', 400);
         const flow = { kind: 'mcp', oauth: saved.oauth };
         const dev = String(form.get('dev') || '');
         if (dev && isDev(env, url)) return finishLogin(env, url, flow, { id: 'dev-' + dev.replace(/[^\w.@-]/g, ''), email: dev, name: 'Dev ' + dev });
