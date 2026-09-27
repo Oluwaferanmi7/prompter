@@ -1,6 +1,6 @@
 // Offline cache for the app shell. Stale-while-revalidate: opens instantly (even with
 // no signal on set), fetches updates in the background for the next launch.
-const VERSION = 'prompter-v9';
+const VERSION = 'prompter-v10';
 const SHELL = [
   './',
   'index.html',
@@ -34,7 +34,9 @@ self.addEventListener('install', (e) => {
   e.waitUntil(
     caches
       .open(VERSION)
-      .then((c) => c.addAll(SHELL))
+      // cache: 'reload' skips the browser's HTTP cache, which can hold the previous
+      // version for ~10 minutes after a deploy and would get saved as the "new" one.
+      .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
   );
 });
@@ -56,7 +58,7 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(
     caches.open(VERSION).then(async (cache) => {
       const cached = await cache.match(req, { ignoreSearch: true });
-      const network = fetch(req)
+      const network = fetch(req, { cache: 'no-cache' })
         .then((res) => {
           if (res.ok) cache.put(req, res.clone());
           return res;

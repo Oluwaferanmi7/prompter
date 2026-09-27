@@ -359,6 +359,31 @@ if (!prefs.seenTip) {
   setTimeout(() => toast(isIOS && !standalone ? 'Tip: Share → Add to Home Screen to install' : 'Tap ⋯ → Connect to control another phone'), 1200);
 }
 
+// Updates. The app runs from an offline copy; check for a new version on launch and
+// whenever it comes back to the front. A new version takes over right away if nothing is
+// happening (just opened, not scrolling, no voice glide, not editing); otherwise it waits
+// for the next launch so a take is never interrupted.
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  const hadController = !!navigator.serviceWorker.controller;
+  let wokeAt = Date.now();
+  let reloading = false;
+  navigator.serviceWorker
+    .register('sw.js')
+    .then((reg) => {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') return;
+        wokeAt = Date.now();
+        reg.update().catch(() => {});
+      });
+    })
+    .catch(() => {});
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return; // first install: nothing to swap
+    const e = prompter.engine;
+    const editing = !!document.querySelector('.editor:not([hidden])');
+    if (Date.now() - wokeAt < 20000 && !e.playing && !e.voice && !editing) {
+      reloading = true;
+      location.reload();
+    } else toast('Update downloaded. It applies next time you open the app.');
+  });
 }
