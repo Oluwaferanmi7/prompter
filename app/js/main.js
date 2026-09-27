@@ -6,6 +6,7 @@ import * as lib from './library.js';
 import * as store from './store.js';
 import { createTakeLog } from './takelog.js';
 import { createHome } from './home.js';
+import { createCloud } from './cloud.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -31,6 +32,7 @@ let prompter;
 let remote;
 let home;
 const log = createTakeLog({ code: store.getMyCode() });
+const cloud = createCloud({ toast, onChange: () => home?.refresh() });
 
 // ------------------------------------------------------------------ link + protocol
 const link = new Link({
@@ -300,6 +302,15 @@ lib.subscribe((change) => {
   if (change.source === 'local' && change.type === 'upsert') {
     link.send({ t: 'upsert', script: change.script });
     link.sendToController({ t: 'upsert', script: change.script });
+  } else if (change.source === 'cloud') {
+    // Arrived from the cloud library (another device, or Claude): pass it to linked
+    // devices too, so a teleprompter that isn't signed in still gets it.
+    for (const id of change.ids) {
+      const script = lib.raw().find((s) => s.id === id);
+      if (!script) continue;
+      link.send({ t: 'upsert', script });
+      link.sendToController({ t: 'upsert', script });
+    }
   } else if (change.source.startsWith('remote:')) {
     // An edit from one connected phone: pass it on to the others so every library and
     // preview stays in step.
@@ -333,6 +344,7 @@ remote = createRemote({ link, hub, toast, onHome: showHome });
 home = createHome({
   link,
   hub,
+  cloud,
   toast,
   summary: () => roster.summary(),
   onTeleprompter: showLocal,
@@ -365,6 +377,12 @@ prompter.start();
 // controlling; the teleprompter device lands on its Scripts). First run: Home.
 // Returning from the background doesn't re-run this, so a take is never interrupted.
 const lastScreen = store.getPrefs().screen;
+// Back from Google sign-in: #/signin?c=<one-time code>
+const signin = /^#\/signin\?c=([\w-]+)/.exec(location.hash);
+if (signin) {
+  history.replaceState(null, '', '#/home');
+  cloud.finishSignIn(signin[1]);
+}
 if (!location.hash) {
   if (lastScreen === 'remote' && store.getRemoteCode()) history.replaceState(null, '', '#/remote');
   else if (lastScreen !== 'local') history.replaceState(null, '', '#/home');

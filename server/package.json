@@ -1,0 +1,17 @@
+{
+  "name": "lim-prompter-cloud",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "deploy": "wrangler deploy",
+    "db:local": "wrangler d1 execute prompter --local --file=schema.sql",
+    "db:remote": "wrangler d1 execute prompter --remote --file=schema.sql"
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "^1.1.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.141.0"
+  }
+}

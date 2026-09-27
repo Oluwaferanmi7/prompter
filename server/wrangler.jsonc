@@ -1,0 +1,21 @@
+{
+  // LiM Prompter cloud. Secrets (not in this file): GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+  //   npx wrangler secret put GOOGLE_CLIENT_ID
+  //   npx wrangler secret put GOOGLE_CLIENT_SECRET
+  "name": "lim-prompter",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  // global_fetch_strictly_public: SSRF protection, required for client ID metadata documents
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "vars": {
+    // Where sign-in may return to (the app).
+    "APP_ORIGINS": "https://oluwaferanmi7.github.io,http://localhost:5173"
+  },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "prompter", "database_id": "REPLACE_AFTER_wrangler_d1_create" }
+  ],
+  "kv_namespaces": [
+    { "binding": "OAUTH_KV", "id": "REPLACE_AFTER_wrangler_kv_namespace_create" }
+  ],
+  "observability": { "enabled": true }
+}

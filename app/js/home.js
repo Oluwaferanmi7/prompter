@@ -11,7 +11,7 @@ const ICON = {
   viewer: '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
 };
 
-export function createHome({ link, hub, summary, toast, onTeleprompter, onScripts, onRemote, onLogs }) {
+export function createHome({ link, hub, cloud, summary, toast, onTeleprompter, onScripts, onRemote, onLogs }) {
   const view = $('home');
   view.innerHTML = `
     <div class="home-in">
@@ -33,6 +33,10 @@ export function createHome({ link, hub, summary, toast, onTeleprompter, onScript
         <div class="set-sub" data-ask></div>
         <input class="code-input" maxlength="4" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABCD">
         <div class="status-line" data-err></div>
+      </div>
+      <div class="home-cloud" hidden>
+        <div class="hc-txt"><b>Cloud library</b><small data-cloud></small></div>
+        <button class="btn small" data-cloud-btn></button>
       </div>
       <div class="home-links">
         <button class="btn ghost small" data-l="scripts">Scripts</button>
@@ -77,6 +81,12 @@ export function createHome({ link, hub, summary, toast, onTeleprompter, onScript
     const m = e.target.closest('[data-m]')?.dataset.m;
     const l = e.target.closest('[data-l]')?.dataset.l;
     const change = e.target.closest('[data-change]');
+    if (e.target.closest('[data-cloud-btn]')) {
+      if (cloud.signedIn) {
+        if (confirm('Sign out of the cloud library on this device? Scripts stay on the device.')) cloud.signOut();
+      } else cloud.signIn();
+      return;
+    }
     if (change) {
       e.stopPropagation();
       return askCode(change.dataset.change);
@@ -114,6 +124,15 @@ export function createHome({ link, hub, summary, toast, onTeleprompter, onScript
         ch.textContent = 'Change';
         sub.append(' · ', ch);
       }
+    }
+    const box = view.querySelector('.home-cloud');
+    box.hidden = !cloud.enabled;
+    if (cloud.enabled) {
+      const label = { idle: 'synced', syncing: 'syncing…', offline: 'offline, will sync when back', error: "couldn't reach the server, retrying" }[cloud.status] || '';
+      view.querySelector('[data-cloud]').textContent = cloud.signedIn ? `${cloud.email} · ${label}` : 'Sign in to keep your scripts safe in your own library and edit them from your Claude.';
+      const btn = view.querySelector('[data-cloud-btn]');
+      btn.textContent = cloud.signedIn ? 'Sign out' : 'Sign in with Google';
+      btn.className = 'btn small ' + (cloud.signedIn ? 'ghost' : 'primary');
     }
     view.querySelector('[data-code]').textContent = link.code;
     view.querySelector('[data-status]').textContent = link.host === 'ready' ? '' : link.host === 'offline' ? ' · offline' : ' · starting…';

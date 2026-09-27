@@ -147,7 +147,7 @@ export function createRemote({ link, hub, toast, onHome }) {
 
   // ================================================================ keyboard (laptop)
   document.addEventListener('keydown', (e) => {
-    if (!active || e.target.matches('input, textarea')) return;
+    if (!active || e.target.matches?.('input, textarea')) return;
     if (view.querySelector('.sheet:not([hidden]), .modal')) return; // panel or editor open
     const k = e.key;
     if (k === 'f' || k === 'F') return toggleFullscreen();

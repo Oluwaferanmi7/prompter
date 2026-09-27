@@ -214,7 +214,7 @@ export function createPrompter({ link, log, roster, hub, settings, toast, onOpen
 
   // Keyboard + Bluetooth page-turner / presentation clickers.
   document.addEventListener('keydown', (e) => {
-    if (view.hidden || e.target.matches('input, textarea')) return;
+    if (view.hidden || e.target.matches?.('input, textarea')) return;
     const k = e.key;
     if (k === ' ' || k === 'Enter' || k === 'MediaPlayPause') engine.toggle();
     else if (k === 'ArrowDown') ctl.nudge(1);
