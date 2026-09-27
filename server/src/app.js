@@ -41,7 +41,8 @@ function page(title, body, status = 200, headers = {}) {
 h1{font-size:22px;margin:0 0 8px}p{color:#bdbdc2;margin:8px 0}b{color:#ffde59}
 button{margin-top:18px;width:100%;height:50px;border:0;border-radius:12px;background:#ffde59;color:#222;font-weight:700;font-size:16px}
 small{display:block;margin-top:14px;color:#8a8a90}</style></head><body><div class="card">${body}</div></body></html>`,
-    { status, headers: { 'content-type': 'text/html; charset=utf-8', 'x-frame-options': 'DENY', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'", ...headers } }
+    // form-action also governs where a form's redirect may go, so Google must be listed.
+    { status, headers: { 'content-type': 'text/html; charset=utf-8', 'x-frame-options': 'DENY', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://accounts.google.com", ...headers } }
   );
 }
 
@@ -208,7 +209,7 @@ export const appHandler = {
           `<h1>Connect <b>${esc(who)}</b> to LiM Prompter?</h1>
            <p>It will be able to <b>read, create and edit your scripts</b>. Scripts it changes show up on your teleprompter.</p>
            <p>Next you'll sign in with Google, so it only ever reaches <b>your</b> library.</p>
-           <form method="post" action="/authorize"><input type="hidden" name="n" value="${nonce}">${devBox}<button>Continue with Google</button><small>Google can take a few seconds to open.</small></form>
+           <form method="post" action="/authorize"><input type="hidden" name="n" value="${nonce}">${devBox}<button>Continue with Google</button></form>
            <small>Returns to ${esc(host)}</small>`,
           200
         );
