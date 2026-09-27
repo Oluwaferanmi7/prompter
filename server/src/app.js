@@ -208,7 +208,7 @@ export const appHandler = {
           `<h1>Connect <b>${esc(who)}</b> to LiM Prompter?</h1>
            <p>It will be able to <b>read, create and edit your scripts</b>. Scripts it changes show up on your teleprompter.</p>
            <p>Next you'll sign in with Google, so it only ever reaches <b>your</b> library.</p>
-           <form method="post" action="/authorize"><input type="hidden" name="n" value="${nonce}">${devBox}<button>Continue with Google</button></form>
+           <form method="post" action="/authorize"><input type="hidden" name="n" value="${nonce}">${devBox}<button>Continue with Google</button><small>Google can take a few seconds to open.</small></form>
            <small>Returns to ${esc(host)}</small>`,
           200
         );
@@ -220,7 +220,9 @@ export const appHandler = {
         if (from !== url.origin) return page('Connect', "<h1>Can't approve from here</h1><p>Go back to Claude and click Connect again.</p>", 403);
         const form = await request.formData();
         const nonce = String(form.get('n') || '');
-        const saved = nonce ? await kvTake(env, 'approve:' + nonce) : null;
+        // Not single-use: a second tap (slow page, impatient thumb) must carry on to Google,
+        // not fail. It still expires, and only posts from this page count (checked above).
+        const saved = nonce ? await env.OAUTH_KV.get('lp:approve:' + nonce, 'json') : null;
         if (!saved) return page('Connect', '<h1>This approval page expired</h1><p>Step 1 of 2. Go back to Claude and click Connect again.</p>', 400);
         const flow = { kind: 'mcp', oauth: saved.oauth };
         const dev = String(form.get('dev') || '');
