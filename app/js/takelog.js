@@ -18,7 +18,7 @@
 //     pause    {a, w}                      stopped, and where
 //     end      {}                          reached the end of the script
 //     speed    {v}                         scroll speed changed
-//     jump     {kind, from, to, dir, fw, tw}  manual move; kind: para | nudge | top | tap | drag
+//     jump     {kind, from, to, dir, fw, tw}  manual move; kind: para | page | nudge | top | tap | drag
 //     pos      {a, w}                      position at the reading line, ~1/s while moving
 //     voice    {on}                        voice glide switched on/off
 //     heard    {text}                      what voice glide heard (throttled)

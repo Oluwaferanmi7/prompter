@@ -7,7 +7,7 @@ import * as store from './store.js';
 
 const $ = (id) => document.getElementById(id);
 
-export function createRemote({ link, hub, toast, onOpenLocal }) {
+export function createRemote({ link, hub, toast, onHome }) {
   const view = $('remote');
   const preview = $('r-preview');
   const pv = $('r-content');
@@ -67,6 +67,7 @@ export function createRemote({ link, hub, toast, onOpenLocal }) {
     },
     para: (dir) => send({ t: 'para', dir }),
     nudge: (lines) => send({ t: 'nudge', lines }),
+    page: (dir) => send({ t: 'page', dir }),
     seekAnchor: (a, drag) => send({ t: 'seek', a, drag }),
     setSpeed(v) {
       targetSettings.speed = Math.max(1, Math.min(30, Math.round(v * 2) / 2));
@@ -97,7 +98,7 @@ export function createRemote({ link, hub, toast, onOpenLocal }) {
       get: (id) => request({ t: 'getlog', id }, 'log', 30000).then((m) => m.data),
     },
   };
-  const controls = mountControls({ root: view, ctl, hub, toast });
+  const controls = mountControls({ root: view, ctl, hub, toast, onHome });
 
   // ================================================================ viewer mode
   // A viewer only watches: no control bar, no header, just the words full screen. A small
@@ -105,7 +106,7 @@ export function createRemote({ link, hub, toast, onOpenLocal }) {
   // devices that allow it (laptops, not iPhone).
   const corner = document.createElement('div');
   corner.className = 'v-corner';
-  corner.innerHTML = `<button data-v="menu" aria-label="Menu">⋯</button>${document.fullscreenEnabled ? '<button data-v="fs" aria-label="Full screen">⤢</button>' : ''}`;
+  corner.innerHTML = `<button data-v="home" aria-label="Home">⌂</button><button data-v="smaller" aria-label="Smaller text">A−</button><button data-v="bigger" aria-label="Bigger text">A+</button>${document.fullscreenEnabled ? '<button data-v="fs" aria-label="Full screen">⤢</button>' : ''}<button data-v="menu" aria-label="Menu">⋯</button>`;
   view.appendChild(corner);
   function toggleFullscreen() {
     try {
@@ -116,8 +117,16 @@ export function createRemote({ link, hub, toast, onOpenLocal }) {
   corner.addEventListener('click', (e) => {
     const b = e.target.closest('[data-v]');
     if (!b) return;
-    if (b.dataset.v === 'menu') controls.openPanel('connect');
-    else toggleFullscreen();
+    const v = b.dataset.v;
+    if (v === 'menu') controls.openPanel('connect');
+    else if (v === 'home') onHome?.();
+    else if (v === 'smaller' || v === 'bigger') {
+      // A viewer picks its own text size (the remote stays true to scale).
+      const p = store.getPrefs();
+      p.viewerSize = Math.round(Math.max(12, Math.min(220, pvFont * (v === 'bigger' ? 1.12 : 1 / 1.12))));
+      store.savePrefs(p);
+      layoutPreview();
+    } else toggleFullscreen();
   });
   let idleTimer = 0;
   function wake() {
@@ -147,9 +156,9 @@ export function createRemote({ link, hub, toast, onOpenLocal }) {
       Enter: () => ctl.toggle(),
       ArrowDown: () => ctl.nudge(1),
       ArrowUp: () => ctl.nudge(-1),
-      ArrowRight: () => ctl.para(1),
+      ArrowRight: () => ctl.page(1),
       PageDown: () => ctl.para(1),
-      ArrowLeft: () => ctl.para(-1),
+      ArrowLeft: () => ctl.page(-1),
       PageUp: () => ctl.para(-1),
       '+': () => ctl.setSpeed(targetSettings.speed + 0.5),
       '=': () => ctl.setSpeed(targetSettings.speed + 0.5),
@@ -186,8 +195,13 @@ export function createRemote({ link, hub, toast, onOpenLocal }) {
     if (!hgt) return;
     const scale = ps.w ? preview.clientWidth / ps.w : 0;
     pvFont = scale ? Math.max(8, targetSettings.fontSize * scale) : 21;
+    let pad = scale ? preview.clientWidth * (targetSettings.margin / 100) : 18;
+    if (view.classList.contains('viewer')) {
+      // Viewer: its own size (default: about ten lines on screen), comfortable margins.
+      pvFont = store.getPrefs().viewerSize || Math.max(16, Math.min(pvFont, hgt / (10 * targetSettings.lineHeight)));
+      pad = Math.max(16, preview.clientWidth * 0.05);
+    }
     pv.style.fontSize = pvFont + 'px';
-    const pad = scale ? preview.clientWidth * (targetSettings.margin / 100) : 18;
     preview.style.paddingLeft = preview.style.paddingRight = Math.round(pad) + 'px';
     padTop.style.height = Math.round(hgt * targetSettings.cuePos) + 'px';
     padBot.style.height = Math.round(hgt * (1 - targetSettings.cuePos)) + 'px';
@@ -305,7 +319,7 @@ export function createRemote({ link, hub, toast, onOpenLocal }) {
     controls.update();
   }
   pill.onclick = () => controls.openPanel('connect');
-  $('r-back').onclick = () => onOpenLocal?.();
+  $('r-back').onclick = () => onHome?.();
 
   new ResizeObserver(() => active && layoutPreview()).observe(preview);
 

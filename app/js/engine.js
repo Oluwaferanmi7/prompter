@@ -257,6 +257,8 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
     },
     para: (dir) => jump('para', paraStep(seekTarget ?? y, m, content, dir), 9),
     nudge: (lines) => jump('nudge', (seekTarget ?? y) + lines * lineH(), 12),
+    // Half a screen forward/back (keyboard ← →).
+    page: (dir) => jump('page', (seekTarget ?? y) + dir * stage.clientHeight * 0.5, 9),
     top() {
       pause();
       jump('top', 0, 9);

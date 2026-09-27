@@ -5,6 +5,7 @@ import { applyMode } from './controls.js';
 import * as lib from './library.js';
 import * as store from './store.js';
 import { createTakeLog } from './takelog.js';
+import { createHome } from './home.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -28,6 +29,7 @@ applyMode();
 const settings = store.getSettings();
 let prompter;
 let remote;
+let home;
 const log = createTakeLog({ code: store.getMyCode() });
 
 // ------------------------------------------------------------------ link + protocol
@@ -37,6 +39,7 @@ const link = new Link({
   onStatus: () => {
     prompter?.linkStatus();
     remote?.linkStatus();
+    home?.refresh();
   },
   onControllerChange(attached, code) {
     if (attached) {
@@ -139,6 +142,7 @@ const roster = (() => {
       const phones = r.list();
       for (const p of phones) link.sendTo(p.code, { t: 'roster', you: { role: p.role, control: p.control }, multi: r.multi, seat, seatOnline: online(seat), phones });
       prompter?.linkStatus();
+      home?.refresh();
     },
   };
   setInterval(() => r.tick(), 5000);
@@ -232,6 +236,9 @@ function fromController(msg, code) {
     case 'nudge':
       c.nudge(msg.lines);
       break;
+    case 'page':
+      c.page(msg.dir);
+      break;
     case 'top':
       c.top();
       break;
@@ -303,8 +310,10 @@ lib.subscribe((change) => {
 });
 
 // ------------------------------------------------------------------ screens
+// Screens: #/home, #/remote, and no hash = this device's teleprompter.
 const showRemote = () => (location.hash = '#/remote');
 const showLocal = () => (location.hash = '');
+const showHome = () => (location.hash = '#/home');
 
 prompter = createPrompter({
   link,
@@ -314,34 +323,54 @@ prompter = createPrompter({
   settings,
   toast,
   onOpenRemote: showRemote,
+  onHome: showHome,
   onState: (s) => link.sendToController({ t: 'state', ...s }),
   onSettings: (s) => link.sendToController({ t: 'settings', settings: s }),
   onSelect: (id) => link.sendToController({ t: 'select', id }),
   onVoiceStatus: (s, detail) => link.sendToController({ t: 'voice-status', s, detail }),
 });
-remote = createRemote({ link, hub, toast, onOpenLocal: showLocal });
+remote = createRemote({ link, hub, toast, onHome: showHome });
+home = createHome({
+  link,
+  hub,
+  toast,
+  summary: () => roster.summary(),
+  onTeleprompter: showLocal,
+  onRemote: showRemote,
+  onScripts() {
+    showLocal();
+    prompter.controls.openPanel('scripts');
+  },
+  onLogs: (where) => prompter.controls.openLogs(where),
+});
 
 function route() {
-  const wantRemote = location.hash.startsWith('#/remote');
-  if (wantRemote) remote.enter();
+  const hash = location.hash;
+  const screen = hash.startsWith('#/remote') ? 'remote' : hash.startsWith('#/home') ? 'home' : 'local';
+  if (screen === 'remote') remote.enter();
   else remote.leave();
-  // Remember which screen this device was last on, so a remote reopens as a remote.
+  if (screen === 'home') home.enter();
+  else home.leave();
+  // Remember which screen this device was last on, so it reopens there.
   const p = store.getPrefs();
-  if (p.screen !== (wantRemote ? 'remote' : 'local')) {
-    p.screen = wantRemote ? 'remote' : 'local';
+  if (p.screen !== screen) {
+    p.screen = screen;
     store.savePrefs(p);
   }
 }
 window.addEventListener('hashchange', route);
 
 prompter.start();
-if (store.getPrefs().screen === 'remote' && store.getRemoteCode() && !location.hash) history.replaceState(null, '', '#/remote');
+// Cold start: reopen where this device was last (a remote goes straight back to
+// controlling; the teleprompter device lands on its Scripts). First run: Home.
+// Returning from the background doesn't re-run this, so a take is never interrupted.
+const lastScreen = store.getPrefs().screen;
+if (!location.hash) {
+  if (lastScreen === 'remote' && store.getRemoteCode()) history.replaceState(null, '', '#/remote');
+  else if (lastScreen !== 'local') history.replaceState(null, '', '#/home');
+}
 route();
-
-// Cold start lands on Scripts (pick one, or add a new one) unless this device was being
-// used as a remote. Returning from the background doesn't re-run this, so a shoot in
-// progress is never interrupted.
-if (!location.hash.startsWith('#/remote')) prompter.controls.openPanel('scripts');
+if (!location.hash) prompter.controls.openPanel('scripts');
 const splash = $('splash');
 splash?.addEventListener('animationend', (e) => e.animationName === 'splash-out' && splash.remove());
 setTimeout(() => splash?.remove(), 3500); // belt and braces

@@ -39,6 +39,7 @@
 
       <!-- not mirrored -->
       <div class="p-top" id="p-top">
+        <button class="chip home-chip" id="p-home" aria-label="Home"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg></button>
         <span class="wordmark"><b>LiM</b> Prompter</span>
         <span class="spacer"></span>
         <span class="ctrl-dot" id="p-ctrl" hidden title="A remote is controlling this phone"><i></i>Remote in control</span>
@@ -51,7 +52,7 @@
     <!-- ============================ REMOTE (controls another phone) ============================ -->
     <section id="remote" class="view remote" hidden>
       <header class="r-top">
-        <button class="back-btn" id="r-back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg><span>My teleprompter</span></button>
+        <button class="back-btn" id="r-back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg><span>Home</span></button>
         <div class="r-title" id="r-title">Remote</div>
         <button class="pill" id="r-pill"><span class="dot"></span><span>Not connected</span></button>
       </header>
@@ -68,6 +69,9 @@
       </div>
       <!-- control bar + panel are mounted here by controls.js -->
     </section>
+
+    <!-- ============================ HOME (what is this device doing?) ============================ -->
+    <section id="home" class="view home" hidden></section>
 
     <div class="toast" id="toast" hidden></div>
   </body>

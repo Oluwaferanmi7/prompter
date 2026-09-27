@@ -9,7 +9,7 @@ import { createVoice } from './voice.js';
 
 const $ = (id) => document.getElementById(id);
 
-export function createPrompter({ link, log, roster, hub, settings, toast, onOpenRemote, onState, onSettings, onSelect, onVoiceStatus }) {
+export function createPrompter({ link, log, roster, hub, settings, toast, onOpenRemote, onHome, onState, onSettings, onSelect, onVoiceStatus }) {
   const view = $('prompter');
   const stage = $('p-stage');
   const hudTop = $('p-top');
@@ -98,6 +98,10 @@ export function createPrompter({ link, log, roster, hub, settings, toast, onOpen
       engine.nudge(n);
       voiceResync();
     },
+    page(d) {
+      engine.page(d);
+      voiceResync();
+    },
     seekAnchor(a, drag) {
       engine.seekAnchor(a, drag);
       voiceResync();
@@ -136,7 +140,7 @@ export function createPrompter({ link, log, roster, hub, settings, toast, onOpen
     },
   };
 
-  const controls = mountControls({ root: view, ctl, hub, toast, onOpenRemote });
+  const controls = mountControls({ root: view, ctl, hub, toast, onOpenRemote, onHome });
 
   // ------------------------------------------------------------------ bar visibility
   let barTimer = 0;
@@ -186,15 +190,39 @@ export function createPrompter({ link, log, roster, hub, settings, toast, onOpen
   stage.addEventListener('pointercancel', endPointer);
   view.addEventListener('pointerdown', () => keepAwake(), { capture: true });
 
+  // Trackpad / mouse wheel scrolls the script like a drag.
+  let wheelEnd = 0;
+  let wheelY = null;
+  stage.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
+      if (wheelY == null) wheelY = engine.dragStart();
+      const px = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * stage.clientHeight : e.deltaY;
+      wheelY += px * (engine.settings.mirrorY ? -1 : 1);
+      engine.dragTo(wheelY);
+      wheelY = engine.y;
+      clearTimeout(wheelEnd);
+      wheelEnd = setTimeout(() => {
+        wheelY = null;
+        engine.dragEnd();
+        voiceResync();
+      }, 180);
+    },
+    { passive: false }
+  );
+
   // Keyboard + Bluetooth page-turner / presentation clickers.
   document.addEventListener('keydown', (e) => {
     if (view.hidden || e.target.matches('input, textarea')) return;
     const k = e.key;
     if (k === ' ' || k === 'Enter' || k === 'MediaPlayPause') engine.toggle();
-    else if (k === 'ArrowDown') engine.nudge(1);
-    else if (k === 'ArrowUp') engine.nudge(-1);
-    else if (k === 'PageDown' || k === 'ArrowRight') engine.para(1);
-    else if (k === 'PageUp' || k === 'ArrowLeft') engine.para(-1);
+    else if (k === 'ArrowDown') ctl.nudge(1);
+    else if (k === 'ArrowUp') ctl.nudge(-1);
+    else if (k === 'ArrowRight') ctl.page(1);
+    else if (k === 'ArrowLeft') ctl.page(-1);
+    else if (k === 'PageDown') ctl.para(1);
+    else if (k === 'PageUp') ctl.para(-1);
     else if (k === '+' || k === '=') ctl.setSpeed(engine.settings.speed + 0.5);
     else if (k === '-' || k === '_') ctl.setSpeed(engine.settings.speed - 0.5);
     else if (k === 'Home') engine.top();
@@ -204,6 +232,7 @@ export function createPrompter({ link, log, roster, hub, settings, toast, onOpen
 
   new ResizeObserver(() => !view.hidden && engine.remeasure()).observe(stage);
   remoteChip.onclick = () => onOpenRemote?.();
+  $('p-home').onclick = () => onHome?.();
 
   // ------------------------------------------------------------------ position memory
   let posTimer = 0;

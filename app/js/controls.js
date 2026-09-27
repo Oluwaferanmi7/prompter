@@ -24,7 +24,7 @@ const ICON = {
   close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
 };
 
-export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
+export function mountControls({ root, ctl, hub, toast, onOpenRemote, onHome }) {
   // Connected but not allowed to drive (viewer, or another remote has control)?
   // Returns the reason and shows it; null when free to act.
   function locked() {
@@ -188,7 +188,7 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
   // ------------------------------------------------------------------ panel
   const panel = h(`
     <div class="sheet panel" hidden>
-      <div class="sheet-brand"><img src="icons/ls-mark-gold.png" alt=""><span><b>LiM</b> Prompter</span></div>
+      <div class="sheet-brand"><img src="icons/ls-mark-gold.png" alt=""><span><b>LiM</b> Prompter</span><button class="brand-home" data-home>‹ Home</button></div>
       <header class="sheet-head">
         <h2 class="sheet-title">Scripts</h2>
         <button class="icon-btn" data-close aria-label="Close">${ICON.close}</button>
@@ -204,6 +204,10 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
   const body = panel.querySelector('[data-body]');
   let tab = 'scripts';
   panel.querySelector('[data-close]').onclick = closePanel;
+  panel.querySelector('[data-home]').onclick = () => {
+    closePanel();
+    onHome?.();
+  };
   panel.querySelectorAll('.tab').forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
 
   function openPanel(name = tab) {
@@ -286,7 +290,7 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
       ul.appendChild(li);
     }
     const foot = h(`<div class="panel-foot"><button class="btn ghost small" data-logs>Take logs</button><button class="btn ghost small" data-export>Back up scripts</button><label class="btn ghost small">Restore<input type="file" accept=".json,application/json" hidden></label></div>`);
-    foot.querySelector('[data-logs]').onclick = openLogs;
+    foot.querySelector('[data-logs]').onclick = () => openLogs();
     foot.querySelector('[data-export]').onclick = exportScripts;
     foot.querySelector('input').onchange = importScripts;
     body.append(head, ul, foot);
@@ -349,7 +353,7 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
   // ---- take logs (recorded on the teleprompter phone; see takelog.js)
   const pad2 = (n) => String(n).padStart(2, '0');
   const clock = (t) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  async function openLogs() {
+  async function openLogs(where = root) {
     const sheet = h(`<div class="modal"><div class="modal-card logs-card">
       <div class="a-title">Take logs</div>
       <p class="muted small">One per script opening, ${ctl.local ? 'recorded on this device' : 'recorded on the teleprompter'}: play, pauses, jumps back, speed, voice position and script edits, with times. Drop the file next to the footage for the editor.</p>
@@ -358,7 +362,7 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
     const ul = sheet.querySelector('.log-list');
     sheet.querySelector('.cancel').onclick = () => sheet.remove();
     sheet.addEventListener('click', (e) => e.target === sheet && sheet.remove());
-    root.appendChild(sheet);
+    where.appendChild(sheet);
     let list;
     try {
       list = await ctl.logs.list();
@@ -730,7 +734,7 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote }) {
     if (!panel.hidden && tab === 'connect') syncConnect();
   }
 
-  return { bar, panel, editor, openPanel, closePanel, openEditor, update, syncConnect, closePop, get panelOpen() { return !panel.hidden; } };
+  return { bar, panel, editor, openPanel, closePanel, openEditor, openLogs, update, syncConnect, closePop, get panelOpen() { return !panel.hidden; } };
 }
 
 // Light / dark / auto for the app chrome.
