@@ -274,20 +274,17 @@ export function createHub({ link, hub, remote, toast, onHome }) {
     const P = prefs();
     const cams = [];
     const mics = [];
-    let n = 0;
+    // Unnamed inputs are numbered among what's picked: Camera 1, Camera 2, Mic 1…
     for (const d of camDevs) {
-      n++;
       const s = open.get(d.deviceId);
-      if (s) cams.push({ name: P.cams?.[d.deviceId]?.name || `Camera ${n}`, label: d.label, stream: s });
+      if (s) cams.push({ name: P.cams?.[d.deviceId]?.name || `Camera ${cams.length + 1}`, label: d.label, stream: s });
     }
     for (const [code, ph] of phones) {
       if (ph.stream && (P.phones?.[code]?.use ?? true)) cams.push({ name: P.phones?.[code]?.name || `Phone ${code}`, label: `Phone ${code}`, stream: ph.stream, phone: true });
     }
-    let m = 0;
     for (const d of micDevs) {
-      m++;
       const s = open.get(d.deviceId);
-      if (s) mics.push({ name: P.mics?.[d.deviceId]?.name || (VIRTUAL.test(d.label) ? d.label : `Mic ${m}`), label: d.label, stream: s });
+      if (s) mics.push({ name: P.mics?.[d.deviceId]?.name || `Mic ${mics.length + 1}`, label: d.label, stream: s });
     }
     return { cams, mics };
   }
