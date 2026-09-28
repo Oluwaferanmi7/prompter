@@ -27,7 +27,7 @@ function createWindow() {
     backgroundColor: '#0b1628',
     title: 'Sapphire',
     show: !SELFTEST, // self-test runs out of sight
-    icon: path.join(__dirname, 'icon.png'),
+    icon: path.join(__dirname, 'icon.ico'),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

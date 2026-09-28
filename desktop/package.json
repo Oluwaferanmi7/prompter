@@ -17,8 +17,8 @@
   "build": {
     "appId": "com.sapphireproductions.app",
     "productName": "Sapphire",
-    "files": ["main.js", "preload.js", "icon.png"],
-    "win": { "target": "nsis", "icon": "icon.png" },
+    "files": ["main.js", "preload.js", "icon.png", "icon.ico"],
+    "win": { "target": "nsis", "icon": "icon.ico" },
     "nsis": { "oneClick": true, "perMachine": false, "shortcutName": "Sapphire" },
     "directories": { "output": "dist" }
   }
