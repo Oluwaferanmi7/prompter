@@ -17,7 +17,7 @@ const fmt = (ms) => {
 const mb = (b) => (b >= 1e9 ? (b / 1e9).toFixed(1) + ' GB' : Math.max(1, Math.round(b / 1e6)) + ' MB');
 
 // Test bench only (?bench=…&fakecam): a moving test pattern and a tone instead of a real camera.
-function fakeStream() {
+export function fakeStream() {
   const c = Object.assign(document.createElement('canvas'), { width: 720, height: 1280 });
   const g = c.getContext('2d');
   let f = 0;
@@ -39,7 +39,7 @@ function fakeStream() {
   osc.start();
   return new MediaStream([...c.captureStream(30).getVideoTracks(), ...dest.stream.getAudioTracks()]);
 }
-const fake = store.NS && new URLSearchParams(location.search).has('fakecam');
+export const fake = store.NS && new URLSearchParams(location.search).has('fakecam');
 
 export function createCamera({ engine, log, toast }) {
   const view = $('prompter');

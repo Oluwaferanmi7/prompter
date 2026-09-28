@@ -67,6 +67,11 @@ export class Link {
       if (this.targetCode) this._dial();
     });
     peer.on('connection', (c) => this._accept(c));
+    // Video calls: a phone in "Camera for the Hub" sends its preview this way.
+    peer.on('call', (call) => {
+      if (this.onCall) this.onCall(call, String(call.peer || '').replace(PREFIX, ''));
+      else call.close();
+    });
     peer.on('disconnected', () => {
       if (peer !== this.peer || peer.destroyed) return;
       setTimeout(() => {
@@ -285,6 +290,12 @@ export class Link {
 
   get connected() {
     return !!this.target?.open;
+  }
+
+  // Send a camera stream to the device we're connected to (it answers in its Hub).
+  callTarget(stream) {
+    if (!this.peer?.open || !this.targetCode) return null;
+    return this.peer.call(PREFIX + this.targetCode, stream);
   }
 
   send(msg) {

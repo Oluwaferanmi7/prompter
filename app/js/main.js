@@ -8,7 +8,8 @@ import { createTakeLog } from './takelog.js';
 import { createHome } from './home.js';
 import { createCloud } from './cloud.js';
 import { createCamera } from './camera.js';
-import { createHub } from './hub.js';
+import { createHub, hubAvailable } from './hub.js';
+import { createCamFeed } from './camfeed.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -35,6 +36,7 @@ let remote;
 let home;
 let camera;
 let hubView;
+let camFeed;
 const log = createTakeLog({ code: store.getMyCode() });
 const cloud = createCloud({ toast, onChange: () => home?.refresh() });
 
@@ -57,11 +59,13 @@ const link = new Link({
     prompter?.linkStatus();
   },
   onOpen() {
-    // We just connected to a teleprompter: swap libraries and say how we're joining.
-    link.send({ t: 'sync', scripts: lib.raw() });
+    // We just connected to a teleprompter: swap libraries (not as a camera: a camera only
+    // sends pictures) and say how we're joining.
+    if (hub.role !== 'camera') link.send({ t: 'sync', scripts: lib.raw() });
     link.send({ t: 'hello', role: hub.role });
-    toast('Connected to teleprompter');
+    if (hub.role !== 'camera') toast('Connected to teleprompter');
     remote?.linkStatus();
+    camFeed?.linkStatus();
   },
 });
 
@@ -110,13 +114,13 @@ const roster = (() => {
     },
     hello(c, next) {
       const changed = roles.get(c) !== next;
-      roles.set(c, next === 'viewer' ? 'viewer' : 'remote');
+      roles.set(c, ['viewer', 'camera'].includes(next) ? next : 'remote');
       if (changed || !seen.has(c)) log.event('phone', { code: c, on: true, role: role(c) });
       seen.add(c);
       if (role(c) === 'viewer' && seat === c) seat = null;
       pickSeat();
       r.broadcast();
-      toast(role(c) === 'viewer' ? `${c} is watching` : r.canControl(c) ? `Remote ${c} connected` : `${c} connected (waiting)`);
+      if (role(c) !== 'camera') toast(role(c) === 'viewer' ? `${c} is watching` : r.canControl(c) ? `Remote ${c} connected` : `${c} connected (waiting)`);
     },
     takeover(c) {
       if (role(c) !== 'remote' || seat === c) return r.broadcast();
@@ -129,6 +133,7 @@ const roster = (() => {
     left(c) {
       if (seen.delete(c)) log.event('phone', { code: c, on: false, role: role(c) });
       if (c === seat) seatLeft = Date.now();
+      hubView?.phoneLeft(c);
       r.broadcast();
     },
     tick() {
@@ -138,10 +143,12 @@ const roster = (() => {
     summary() {
       const l = r.list();
       const rem = l.filter((p) => p.role === 'remote').length;
-      const view = l.length - rem;
+      const view = l.filter((p) => p.role === 'viewer').length;
+      const cams = l.filter((p) => p.role === 'camera').length;
       const parts = [];
       if (rem) parts.push(rem === 1 ? 'Remote' : `${rem} remotes`);
       if (view) parts.push(`${view} viewer${view > 1 ? 's' : ''}`);
+      if (cams) parts.push(`${cams} camera${cams > 1 ? 's' : ''}`);
       return parts.join(' + ') || 'Remote';
     },
     broadcast() {
@@ -163,11 +170,12 @@ const hub = {
   },
   setMulti: (v) => roster.setMulti(v),
   get role() {
-    return store.getPrefs().role === 'viewer' ? 'viewer' : 'remote';
+    const r = store.getPrefs().role;
+    return r === 'viewer' || r === 'camera' ? r : 'remote';
   },
   setRole(v) {
     const p = store.getPrefs();
-    p.role = v === 'viewer' ? 'viewer' : 'remote';
+    p.role = v === 'viewer' || v === 'camera' ? v : 'remote';
     store.savePrefs(p);
     link.send({ t: 'hello', role: p.role });
     remote?.linkStatus();
@@ -274,6 +282,7 @@ function fromTarget(msg) {
       remote.onReply(msg);
       break;
     case 'sync':
+      if (hub.role === 'camera') break;
       lib.merge(msg.scripts, 'remote');
       remote.onSettings(msg.settings);
       if (msg.activeId) remote.onSelect(msg.activeId);
@@ -331,6 +340,7 @@ const showLocal = () => (location.hash = '');
 const showHome = () => (location.hash = '#/home');
 const showCamera = () => (location.hash = '#/camera');
 const showHub = () => (location.hash = '#/hub');
+const showCamFeed = () => (location.hash = '#/feed');
 
 prompter = createPrompter({
   link,
@@ -348,7 +358,10 @@ prompter = createPrompter({
 });
 remote = createRemote({ link, hub, toast, onHome: showHome });
 camera = createCamera({ engine: prompter.engine, log, toast });
-hubView = createHub({ toast, onHome: showHome });
+hubView = createHub({ link, toast, onHome: showHome });
+camFeed = createCamFeed({ link, hub, toast, onHome: showHome });
+// Phones joining as cameras call in; only the Hub (desktop app) takes the call.
+link.onCall = (call, code) => (hubAvailable() ? hubView.onCall(code, call) : call.close());
 home = createHome({
   link,
   hub,
@@ -358,6 +371,7 @@ home = createHome({
   onTeleprompter: showLocal,
   onCamera: showCamera,
   onHub: showHub,
+  onCamFeed: showCamFeed,
   onRemote: showRemote,
   onScripts() {
     showLocal();
@@ -368,7 +382,9 @@ home = createHome({
 
 function route() {
   const hash = location.hash;
-  const screen = hash.startsWith('#/remote') ? 'remote' : hash.startsWith('#/home') ? 'home' : hash.startsWith('#/camera') ? 'camera' : hash.startsWith('#/hub') ? 'hub' : 'local';
+  const screen = hash.startsWith('#/remote') ? 'remote' : hash.startsWith('#/home') ? 'home' : hash.startsWith('#/camera') ? 'camera' : hash.startsWith('#/hub') ? 'hub' : hash.startsWith('#/feed') ? 'feed' : 'local';
+  if (screen === 'feed') camFeed.enter();
+  else camFeed.leave();
   if (screen === 'hub') hubView.enter();
   else hubView.leave();
   if (screen === 'camera') {
