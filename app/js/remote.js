@@ -19,6 +19,8 @@ export function createRemote({ link, hub, toast, onHome }) {
   let targetSettings = { ...store.DEFAULT_SETTINGS };
   let ps = { playing: false, counting: 0, speed: 6, a: { p: 0, f: 0 }, progress: 0, remain: NaN, scriptId: null };
   let active = false;
+  let embedded = null; // container the preview is borrowed into (the Hub's Studio), or null
+  let homeSpot = null;
   // What the teleprompter says about us (null until it does — older app versions never
   // send it, and then this phone simply has control as before).
   let rosterInfo = null;
@@ -196,7 +198,7 @@ export function createRemote({ link, hub, toast, onHome }) {
     const scale = ps.w ? preview.clientWidth / ps.w : 0;
     pvFont = scale ? Math.max(8, targetSettings.fontSize * scale) : 21;
     let pad = scale ? preview.clientWidth * (targetSettings.margin / 100) : 18;
-    if (view.classList.contains('viewer')) {
+    if (embedded || view.classList.contains('viewer')) {
       // Viewer: its own size (default: about ten lines on screen), comfortable margins.
       pvFont = store.getPrefs().viewerSize || Math.max(16, Math.min(pvFont, hgt / (10 * targetSettings.lineHeight)));
       pad = Math.max(16, preview.clientWidth * 0.05);
@@ -388,6 +390,32 @@ export function createRemote({ link, hub, toast, onHome }) {
     },
     scriptChanged(id) {
       if (id === ps.scriptId) renderPreview(false);
+    },
+    // The Hub's Studio shows the teleprompter as a viewer panel: lend it the live preview.
+    get state() {
+      return ps;
+    },
+    attach(el) {
+      const wrap = preview.closest('.preview-wrap');
+      if (embedded === el) return;
+      if (!embedded) homeSpot = { parent: wrap.parentNode, next: wrap.nextSibling };
+      el.appendChild(wrap);
+      embedded = el;
+      active = true;
+      renderPreview(false);
+      linkStatus();
+      lastT = 0;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(frame);
+    },
+    detach() {
+      if (!embedded) return;
+      const wrap = preview.closest('.preview-wrap');
+      homeSpot.parent.insertBefore(wrap, homeSpot.next);
+      embedded = null;
+      active = !view.hidden;
+      if (!active) cancelAnimationFrame(raf);
+      else layoutPreview();
     },
     enter() {
       active = true;

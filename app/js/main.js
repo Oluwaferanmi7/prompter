@@ -48,6 +48,7 @@ const link = new Link({
     prompter?.linkStatus();
     remote?.linkStatus();
     home?.refresh();
+    hubView?.linkStatus();
   },
   onControllerChange(attached, code) {
     if (attached) {
@@ -195,7 +196,7 @@ setInterval(() => {
 }, 500);
 
 // Messages anyone connected may send; everything else needs control.
-const OPEN = new Set(['sync', 'hello', 'takeover', 'getlogs', 'getlog']);
+const OPEN = new Set(['sync', 'hello', 'takeover', 'getlogs', 'getlog', 'rec']);
 
 function handle(msg, from, code) {
   if (from === 'controller') {
@@ -219,6 +220,10 @@ function fromController(msg, code) {
       break;
     case 'takeover':
       roster.takeover(code);
+      break;
+    case 'rec':
+      // The Hub started/stopped recording: mark it in this teleprompter's take log.
+      log.event('rec', { on: !!msg.on, take: String(msg.take || '').slice(0, 120), hub: code });
       break;
     case 'getlogs':
       link.sendTo(code, { t: 'logs', list: log.sessions() });
@@ -358,7 +363,7 @@ prompter = createPrompter({
 });
 remote = createRemote({ link, hub, toast, onHome: showHome });
 camera = createCamera({ engine: prompter.engine, log, toast });
-hubView = createHub({ link, toast, onHome: showHome });
+hubView = createHub({ link, hub, remote, toast, onHome: showHome });
 camFeed = createCamFeed({ link, hub, toast, onHome: showHome });
 // Phones joining as cameras call in; only the Hub (desktop app) takes the call.
 link.onCall = (call, code) => (hubAvailable() ? hubView.onCall(code, call) : call.close());

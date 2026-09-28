@@ -29,6 +29,8 @@
 //     close    {}                          another script was opened
 //     rec      {on, id, mime, w, h, ms}     "Record yourself" started / stopped recording on this
 //                                           device (same clock as the video: rec on = video 0:00)
+//     rec      {on, take, hub}              the Hub computer started / stopped recording (take =
+//                                           its folder name; hub = its code; ~network delay late)
 //   Positions: a = [paragraph, fraction 0..1], w/fw/tw = word index in the script (approx).
 //   Paragraphs are the script's lines (split on "\n"), numbered from 0.
 import { NS } from './store.js';

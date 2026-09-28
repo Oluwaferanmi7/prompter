@@ -4,6 +4,7 @@
 // ("Camera for the Hub" on the phone), and lets you pick and name what this shoot uses.
 // Recording comes next.
 import * as store from './store.js';
+import { createStudio } from './studio.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -25,19 +26,20 @@ const SECTIONS = [
   ['vmics', 'Virtual inputs (Voicemeeter, NDI…)', false],
 ];
 
-export function createHub({ link, toast, onHome }) {
+export function createHub({ link, hub, remote, toast, onHome }) {
   const view = $('hub');
   view.innerHTML = `
     <header class="hub-top">
-      <button class="back-btn" data-h="home"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg><span>Home</span></button>
-      <div class="hub-title">Hub</div>
+      <button class="back-btn" data-h="back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg><span data-h-back>Home</span></button>
+      <div class="hub-title" data-h-title>Hub · Setup</div>
       <button class="btn ghost small" data-h="refresh">Refresh</button>
     </header>
     <div class="hub-body">
       <p class="muted hub-lede">Everything plugged into this computer, plus phones joined as cameras. Tick what this shoot uses and give it a name.</p>
       ${SECTIONS.map(([key, title]) => `<details class="hub-sec" data-sec="${key}"><summary><span>${title}</span><small class="muted" data-count></small></summary><div class="${key.endsWith('mics') ? 'hub-mics' : 'hub-grid'}" data-list></div></details>`).join('')}
-      <p class="muted small hub-note">Recording from the Hub is the next stage.</p>
-    </div>`;
+    </div>
+    <div class="hub-next"><span class="muted small" data-h-sum></span><button class="btn primary" data-h="next">Next: Studio ›</button></div>
+    <div class="hub-studio" hidden></div>`;
   const sec = (key) => view.querySelector(`[data-sec=${key}]`);
   const list = (key) => sec(key).querySelector('[data-list]');
   const count = (key, n, extra = '') => (sec(key).querySelector('[data-count]').textContent = `${n}${extra}`);
@@ -55,7 +57,10 @@ export function createHub({ link, toast, onHome }) {
   }
 
   let active = false;
+  let mode = 'setup'; // setup | studio
   let audioCtx = null;
+  let camDevs = [];
+  let micDevs = [];
   let raf = 0;
   const meters = [];
   const open = new Map(); // deviceId -> MediaStream (this computer's devices)
@@ -201,6 +206,8 @@ export function createHub({ link, toast, onHome }) {
     const isVirtual = (d) => VIRTUAL.test(d.label || '');
     const cams = devices.filter((d) => d.kind === 'videoinput');
     const ins = devices.filter((d) => d.kind === 'audioinput' && d.deviceId !== 'default' && d.deviceId !== 'communications');
+    camDevs = cams;
+    micDevs = ins;
     audioCtx = new AudioContext();
     fill('cams', cams.filter((d) => !isVirtual(d)), camTile, P, false, 'No cameras plugged in. Plug in a camera or capture card, then Refresh.');
     fill('vcams', cams.filter(isVirtual), camTile, P, true, 'None.');
@@ -261,10 +268,57 @@ export function createHub({ link, toast, onHome }) {
     count('phones', phones.size);
   }
 
+  // ------------------------------------------------------------------ setup → studio
+  // What Setup has ticked and opened, named as the user named it.
+  function selection() {
+    const P = prefs();
+    const cams = [];
+    const mics = [];
+    let n = 0;
+    for (const d of camDevs) {
+      n++;
+      const s = open.get(d.deviceId);
+      if (s) cams.push({ name: P.cams?.[d.deviceId]?.name || `Camera ${n}`, label: d.label, stream: s });
+    }
+    for (const [code, ph] of phones) {
+      if (ph.stream && (P.phones?.[code]?.use ?? true)) cams.push({ name: P.phones?.[code]?.name || `Phone ${code}`, label: `Phone ${code}`, stream: ph.stream, phone: true });
+    }
+    let m = 0;
+    for (const d of micDevs) {
+      m++;
+      const s = open.get(d.deviceId);
+      if (s) mics.push({ name: P.mics?.[d.deviceId]?.name || (VIRTUAL.test(d.label) ? d.label : `Mic ${m}`), label: d.label, stream: s });
+    }
+    return { cams, mics };
+  }
+  function summary() {
+    const s = selection();
+    view.querySelector('[data-h-sum]').textContent = `${s.cams.length} camera${s.cams.length === 1 ? '' : 's'} · ${s.mics.length} mic${s.mics.length === 1 ? '' : 's'} selected`;
+  }
+  const studio = createStudio({ root: view.querySelector('.hub-studio'), link, hub, remote, toast, audioCtx: () => audioCtx });
+  function setMode(m) {
+    if (m === 'studio' && studio.recording) return;
+    mode = m;
+    const inStudio = m === 'studio';
+    view.classList.toggle('in-studio', inStudio);
+    view.querySelector('.hub-body').hidden = inStudio;
+    view.querySelector('.hub-next').hidden = inStudio;
+    view.querySelector('[data-h=refresh]').hidden = inStudio;
+    view.querySelector('[data-h-back]').textContent = inStudio ? 'Setup' : 'Home';
+    view.querySelector('[data-h-title]').textContent = inStudio ? 'Hub · Studio' : 'Hub · Setup';
+    if (inStudio) studio.enter(selection());
+    else studio.leave();
+  }
+  setInterval(() => active && mode === 'setup' && summary(), 1000);
+
   view.addEventListener('click', (e) => {
     const h = e.target.closest('[data-h]')?.dataset.h;
-    if (h === 'home') onHome();
-    else if (h === 'refresh') scan();
+    if (h === 'back') {
+      if (studio.recording && !confirm('Stop recording?')) return;
+      if (mode === 'studio') setMode('setup');
+      else onHome();
+    } else if (h === 'refresh') scan();
+    else if (h === 'next') setMode('studio');
   });
   navigator.mediaDevices?.addEventListener?.('devicechange', () => active && scan());
 
@@ -277,10 +331,12 @@ export function createHub({ link, toast, onHome }) {
     },
     leave() {
       if (!active) return;
+      if (mode === 'studio') setMode('setup');
       active = false;
       view.hidden = true;
       closeAll();
     },
+    linkStatus: () => studio.linkStatus(),
     // A phone camera called in (see link.onCall). Answer without sending anything back.
     onCall(code, call) {
       phones.get(code)?.call?.close?.();
