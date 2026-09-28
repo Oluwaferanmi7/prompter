@@ -1,4 +1,4 @@
-# LiM Prompter cloud
+# Sapphire Prompter cloud
 
 Cloudflare Worker behind the app's **Sign in with Google**:
 
@@ -20,7 +20,7 @@ npx wrangler deploy                         # prints the URL, e.g. https://lim-p
 ```
 
 **Google sign-in key** (Google Cloud Console → APIs & Services):
-1. OAuth consent screen: External, app name "LiM Prompter", your email as support + developer contact. Scopes: just the defaults (email, profile, openid). Publish the app (or add test users).
+1. OAuth consent screen: External, app name "Sapphire Prompter", your email as support + developer contact. Scopes: just the defaults (email, profile, openid). Publish the app (or add test users).
 2. Credentials → Create credentials → OAuth client ID → **Web application**.
    - Authorized redirect URI: `https://lim-prompter.<you>.workers.dev/google/callback`
 3. Copy the client ID and secret into the Worker:

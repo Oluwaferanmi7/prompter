@@ -1,28 +1,25 @@
-/* LiM Studios palette: charcoal #333333 · dim gray #64686f · light silver #D8DADA ·
-   anti-flash white #F6F1F1 · yellow #FFDE59 · gold gradient #685032→#F9DCA1→#685032 */
+/* Sapphire Productions palette: Midnight #0B1628 · Sapphire #1E4FAF · Sky #5B9BF0 ·
+   Gold #C5A94A (premium accent, sparingly) · Pearl #EAF3FF. Fonts: Cormorant Garamond
+   (headlines) + Inter (everything else).
+   Token names are historical: --yellow is "the accent", --gold "the premium accent". */
 @font-face {
-  font-family: 'Playfair Display';
-  src: url('fonts/playfair-display.woff2') format('woff2');
-  font-weight: 400 900;
+  font-family: 'Cormorant Garamond';
+  src: url('fonts/cormorant-garamond.woff2') format('woff2');
+  font-weight: 300 700;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Montserrat';
-  src: url('fonts/montserrat.woff2') format('woff2');
-  font-weight: 100 900;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Raleway';
-  src: url('fonts/raleway.woff2') format('woff2');
+  font-family: 'Inter';
+  src: url('fonts/inter.woff2') format('woff2');
   font-weight: 100 900;
   font-display: swap;
 }
 
 :root {
-  --yellow: #ffde59;
-  --gold: linear-gradient(90deg, #685032, #f9dca1, #685032);
-  --on-yellow: #333333;
+  --yellow: #1e4faf;
+  --gold: linear-gradient(90deg, #9c8335, #e2cd84, #9c8335);
+  --on-yellow: #ffffff;
+  --brand-word: #1e4faf;
   --ok: #3fbf7f;
   --warn: #f2b33d;
   --bad: #e5533d;
@@ -31,45 +28,51 @@
   --sab: env(safe-area-inset-bottom, 0px);
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
-  --f-head: 'Playfair Display', Georgia, serif;
-  --f-ui: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --f-body: 'Raleway', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --f-head: 'Cormorant Garamond', Georgia, serif;
+  --f-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --f-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
-  /* light */
-  --bg: #f6f1f1;
+  /* light: Pearl */
+  --bg: #eaf3ff;
   --surface: #ffffff;
-  --surface-2: #ece8e8;
-  --surface-3: #d8dada;
-  --line: #d8dada;
-  --text: #333333;
-  --muted: #64686f;
-  --shadow: 0 10px 30px rgba(51, 51, 51, 0.12);
+  --surface-2: #dce8f9;
+  --surface-3: #c7d7ee;
+  --line: #c7d7ee;
+  --text: #0b1628;
+  --muted: #4d5d78;
+  --shadow: 0 10px 30px rgba(11, 22, 40, 0.14);
   --glass: rgba(255, 255, 255, 0.92);
   color-scheme: light;
 }
 :root[data-theme='dark'] {
-  --bg: #1f2023;
-  --surface: #333333;
-  --surface-2: #3d3f44;
-  --surface-3: #4a4d54;
-  --line: #4a4d54;
-  --text: #f6f1f1;
-  --muted: #a6a9b0;
+  --yellow: #5b9bf0;
+  --on-yellow: #0b1628;
+  --brand-word: #c5a94a;
+  --bg: #0b1628;
+  --surface: #13223a;
+  --surface-2: #1b2e4c;
+  --surface-3: #283f63;
+  --line: #283f63;
+  --text: #eaf3ff;
+  --muted: #9fb2cf;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  --glass: rgba(40, 41, 45, 0.92);
+  --glass: rgba(11, 22, 40, 0.92);
   color-scheme: dark;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #1f2023;
-    --surface: #333333;
-    --surface-2: #3d3f44;
-    --surface-3: #4a4d54;
-    --line: #4a4d54;
-    --text: #f6f1f1;
-    --muted: #a6a9b0;
+    --yellow: #5b9bf0;
+    --on-yellow: #0b1628;
+    --brand-word: #c5a94a;
+    --bg: #0b1628;
+    --surface: #13223a;
+    --surface-2: #1b2e4c;
+    --surface-3: #283f63;
+    --line: #283f63;
+    --text: #eaf3ff;
+    --muted: #9fb2cf;
     --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    --glass: rgba(40, 41, 45, 0.92);
+    --glass: rgba(11, 22, 40, 0.92);
     color-scheme: dark;
   }
 }
@@ -150,8 +153,8 @@ svg {
   align-items: center;
   justify-content: center;
   gap: 14px;
-  background: #333333;
-  color: #f6f1f1;
+  background: #0b1628;
+  color: #eaf3ff;
   animation: splash-out 0.45s ease-in 1.75s forwards;
 }
 .splash-mark {
@@ -166,20 +169,20 @@ svg {
 }
 .splash-word {
   font-family: var(--f-head);
-  font-size: 30px;
+  font-size: 36px;
   letter-spacing: 0.5px;
   animation: word-in 0.6s ease-out 0.55s both;
 }
 .splash-word span {
   font-weight: 800;
-  color: var(--yellow);
+  color: #c5a94a;
 }
 .splash-sub {
   font-family: var(--f-ui);
   font-size: 11px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
-  color: #d8dada;
+  color: #c7d7ee;
   opacity: 0.7;
   animation: word-in 0.6s ease-out 0.85s both;
 }
@@ -234,7 +237,7 @@ svg {
   height: 22px;
 }
 .sheet-brand b {
-  color: var(--yellow);
+  color: var(--brand-word);
   font-weight: 800;
 }
 .sheet-brand + .sheet-head {
@@ -341,7 +344,7 @@ svg {
   left: 0;
   right: 0;
   top: 0;
-  border-top: 2px solid var(--p-cuecolor, #ffde59);
+  border-top: 2px solid var(--p-cuecolor, #c5a94a);
   opacity: 0.4;
 }
 .cue-arrow {
@@ -350,7 +353,7 @@ svg {
   top: -14px;
   border-top: 14px solid transparent;
   border-bottom: 14px solid transparent;
-  border-left: 18px solid var(--p-cuecolor, #ffde59);
+  border-left: 18px solid var(--p-cuecolor, #c5a94a);
 }
 .cue.hide {
   display: none;
@@ -363,7 +366,7 @@ svg {
   font-family: var(--f-head);
   font-size: min(50vw, 50vh);
   font-weight: 800;
-  color: var(--p-cuecolor, #ffde59);
+  color: var(--p-cuecolor, #c5a94a);
   background: color-mix(in srgb, var(--p-bg, #000) 70%, transparent);
   font-variant-numeric: tabular-nums;
 }
@@ -377,7 +380,7 @@ svg {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #f6f1f1;
+  color: #eaf3ff;
   pointer-events: none;
   transition: opacity 0.2s;
 }
@@ -398,7 +401,7 @@ svg {
 }
 .wordmark b {
   font-weight: 800;
-  color: var(--yellow);
+  color: #c5a94a;
 }
 .chip,
 .ctrl-dot {
@@ -413,7 +416,7 @@ svg {
   font-family: var(--f-ui);
   font-size: 12px;
   font-weight: 600;
-  color: #f6f1f1;
+  color: #eaf3ff;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -526,7 +529,7 @@ svg {
   border-radius: 50%;
   background: var(--yellow);
   color: var(--on-yellow);
-  box-shadow: 0 6px 22px rgba(255, 222, 89, 0.35);
+  box-shadow: 0 6px 22px rgba(91, 155, 240, 0.35);
   position: relative;
   margin: 0 4px;
 }
@@ -589,7 +592,7 @@ svg {
 }
 @keyframes pulse {
   50% {
-    box-shadow: 0 0 0 6px rgba(255, 222, 89, 0.25);
+    box-shadow: 0 0 0 6px rgba(91, 155, 240, 0.28);
   }
 }
 /* what voice glide heard (not mirrored) */
@@ -602,8 +605,8 @@ svg {
   padding: 6px 12px;
   border-radius: 99px;
   background: rgba(30, 30, 34, 0.75);
-  border: 1px solid rgba(255, 222, 89, 0.35);
-  color: #f6f1f1;
+  border: 1px solid rgba(197, 169, 74, 0.45);
+  color: #eaf3ff;
   font-family: var(--f-ui);
   font-size: 12px;
   white-space: nowrap;
@@ -695,7 +698,7 @@ svg {
   text-align: center;
   font-family: var(--f-head);
   font-weight: 700;
-  font-size: 17px;
+  font-size: 20px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -810,7 +813,7 @@ svg {
   font-family: var(--f-ui);
   font-size: 12px;
   font-weight: 600;
-  color: #d8dada;
+  color: #c7d7ee;
   background: rgba(20, 20, 24, 0.85);
   padding: 4px 10px;
   border-radius: 99px;
@@ -845,7 +848,7 @@ svg {
 .sheet-title {
   margin: 0;
   font-family: var(--f-head);
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 700;
 }
 .tabs {
@@ -1514,7 +1517,7 @@ input[type='range']::-moz-range-thumb {
   border-radius: 12px;
   background: rgba(30, 30, 34, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #f6f1f1;
+  color: #eaf3ff;
   font-size: 18px;
   font-weight: 700;
 }
@@ -1570,13 +1573,13 @@ input[type='range']::-moz-range-thumb {
   height: 26px;
 }
 .home-brand b {
-  color: var(--yellow);
+  color: var(--brand-word);
   font-weight: 800;
 }
 .home-q {
   margin: 8px 0 6px;
   font-family: var(--f-head);
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 700;
   line-height: 1.15;
 }

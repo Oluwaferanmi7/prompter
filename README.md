@@ -1,4 +1,4 @@
-# LiM Prompter
+# Sapphire Prompter
 
 A free teleprompter web app (PWA) with phone-to-phone remote control, built for a Desview rig.
 

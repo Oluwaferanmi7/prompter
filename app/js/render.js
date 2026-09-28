@@ -76,9 +76,9 @@ export function paraStep(y, m, contentEl, dir) {
 }
 
 export const THEMES = {
-  white: { fg: '#ffffff', bg: '#000000', cue: '#ffde59' },
-  yellow: { fg: '#ffde59', bg: '#000000', cue: '#f6f1f1' },
-  light: { fg: '#333333', bg: '#ffffff', cue: '#e0a800' },
+  white: { fg: '#ffffff', bg: '#000000', cue: '#c5a94a' },
+  yellow: { fg: '#ffde59', bg: '#000000', cue: '#eaf3ff' },
+  light: { fg: '#0b1628', bg: '#ffffff', cue: '#1e4faf' },
 };
 
 export function fmtTime(sec) {

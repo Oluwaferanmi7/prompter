@@ -5,7 +5,7 @@ import * as lib from './library.js';
 
 const VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 
-const INSTRUCTIONS = `LiM Prompter is a teleprompter app. These tools read and edit the user's teleprompter scripts, which sync to their phones within a few seconds, including a script that's live on the teleprompter.
+const INSTRUCTIONS = `Sapphire Prompter is a teleprompter app. These tools read and edit the user's teleprompter scripts, which sync to their phones within a few seconds, including a script that's live on the teleprompter.
 Scripts are read aloud on camera: each line is a paragraph on the teleprompter, blank lines are pauses. Keep the speaker's voice; write for speaking, not reading. Before editing, read the script. Prefer replace_in_script for small changes so the rest stays exactly as it was.`;
 
 const TOOLS = [
@@ -99,7 +99,7 @@ async function rpc(msg, env, userId) {
       return ok({
         protocolVersion: VERSIONS.includes(params.protocolVersion) ? params.protocolVersion : VERSIONS[0],
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'lim-prompter', title: 'LiM Prompter', version: '1.0.0' },
+        serverInfo: { name: 'sapphire-prompter', title: 'Sapphire Prompter', version: '1.0.0' },
         instructions: INSTRUCTIONS,
       });
     case 'ping':

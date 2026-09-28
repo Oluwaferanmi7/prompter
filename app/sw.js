@@ -1,6 +1,6 @@
 // Offline cache for the app shell. Stale-while-revalidate: opens instantly (even with
 // no signal on set), fetches updates in the background for the next launch.
-const VERSION = 'prompter-v13';
+const VERSION = 'prompter-v14';
 const SHELL = [
   './',
   'index.html',
@@ -24,10 +24,9 @@ const SHELL = [
   'js/wakelock.js',
   'vendor/peerjs.min.js',
   'vendor/nosleep-media.js',
-  'fonts/playfair-display.woff2',
-  'fonts/montserrat.woff2',
-  'fonts/raleway.woff2',
-  'icons/ls-mark-gold.png',
+  'fonts/cormorant-garamond.woff2',
+  'fonts/inter.woff2',
+  'icons/sapphire-mark.png',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/apple-touch-icon.png',
