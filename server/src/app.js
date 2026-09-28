@@ -160,7 +160,7 @@ export const appHandler = {
         try {
           origin = new URL(ret).origin;
         } catch {}
-        if (!appOrigins(env).includes(origin)) return page('Sign-in', '<h1>Not allowed</h1><p>Sign-in can only return to the Sapphire Prompter app.</p>', 400);
+        if (!appOrigins(env).includes(origin)) return page('Sign-in', '<h1>Not allowed</h1><p>Sign-in can only return to the Sapphire app.</p>', 400);
         const flow = { kind: 'app', return: ret.split('#')[0] };
         const dev = url.searchParams.get('dev');
         if (dev && isDev(env, url)) return finishLogin(env, url, flow, { id: 'dev-' + dev.replace(/[^\w.@-]/g, ''), email: dev, name: 'Dev ' + dev });
@@ -205,8 +205,8 @@ export const appHandler = {
         } catch {}
         const devBox = isDev(env, url) ? '<p><input name="dev" placeholder="dev email (local only)"></p>' : '';
         return page(
-          'Connect to Sapphire Prompter',
-          `<h1>Connect <b>${esc(who)}</b> to Sapphire Prompter?</h1>
+          'Connect to Sapphire',
+          `<h1>Connect <b>${esc(who)}</b> to Sapphire?</h1>
            <p>It will be able to <b>read, create and edit your scripts</b>. Scripts it changes show up on your teleprompter.</p>
            <p>Next you'll sign in with Google, so it only ever reaches <b>your</b> library.</p>
            <form method="post" action="/authorize"><input type="hidden" name="n" value="${nonce}">${devBox}<button>Continue with Google</button></form>
@@ -233,7 +233,7 @@ export const appHandler = {
         return googleRedirect(env, url, state);
       }
 
-      if (path === '/') return page('Sapphire Prompter', '<h1>Sapphire Prompter cloud</h1><p>Script library and Claude connector for Sapphire Prompter.</p>');
+      if (path === '/') return page('Sapphire', '<h1>Sapphire cloud</h1><p>Script library and Claude connector for Sapphire.</p>');
       return new Response('Not found', { status: 404 });
     } catch (err) {
       console.error(err);

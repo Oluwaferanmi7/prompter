@@ -1,4 +1,4 @@
-// Sapphire Prompter cloud: script library + Claude connector on Cloudflare Workers.
+// Sapphire cloud: script library + Claude connector on Cloudflare Workers.
 //   /mcp            Claude connector (MCP), OAuth-protected — see mcp.js
 //   /authorize, /token, /register   OAuth for the connector (workers-oauth-provider)
 //   /api/*          the app's sync API (Google sign-in session tokens) — see app.js
@@ -29,7 +29,7 @@ function providerFor(origin) {
         authorization_servers: [origin],
         scopes_supported: ['scripts'],
         bearer_methods_supported: ['header'],
-        resource_name: 'Sapphire Prompter scripts',
+        resource_name: 'Sapphire scripts',
       },
     });
     providers.set(origin, p);

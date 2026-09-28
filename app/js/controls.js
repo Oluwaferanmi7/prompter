@@ -188,7 +188,7 @@ export function mountControls({ root, ctl, hub, toast, onOpenRemote, onHome }) {
   // ------------------------------------------------------------------ panel
   const panel = h(`
     <div class="sheet panel" hidden>
-      <div class="sheet-brand"><img src="icons/sapphire-mark.png" alt=""><span><b>Sapphire</b> Prompter</span><button class="brand-home" data-home>‹ Home</button></div>
+      <div class="sheet-brand"><img src="icons/sapphire-mark.png" alt=""><span><b>Sapphire</b></span><button class="brand-home" data-home>‹ Home</button></div>
       <header class="sheet-head">
         <h2 class="sheet-title">Scripts</h2>
         <button class="icon-btn" data-close aria-label="Close">${ICON.close}</button>

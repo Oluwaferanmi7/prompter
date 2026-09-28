@@ -1,6 +1,6 @@
 {
-  "name": "Sapphire Prompter",
-  "short_name": "Prompter",
+  "name": "Sapphire",
+  "short_name": "Sapphire",
   "description": "Free teleprompter with phone-to-phone remote control, built for the Desview.",
   "start_url": "./",
   "scope": "./",

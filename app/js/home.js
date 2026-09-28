@@ -15,7 +15,7 @@ export function createHome({ link, hub, cloud, summary, toast, onTeleprompter, o
   const view = $('home');
   view.innerHTML = `
     <div class="home-in">
-      <div class="home-brand"><img src="icons/sapphire-mark.png" alt=""><span><b>Sapphire</b> Prompter</span></div>
+      <div class="home-brand"><img src="icons/sapphire-mark.png" alt=""><span><b>Sapphire</b></span></div>
       <h1 class="home-q">What's this device doing?</h1>
       <button class="mode" data-m="tele">
         <span class="m-ico">${ICON.tele}</span>

@@ -9,7 +9,7 @@ const TOMBSTONE_TTL = 1000 * 60 * 60 * 24 * 60; // forget deletes after 60 days
 export const WELCOME_ID = 'welcome';
 // Fixed stamp so every phone's untouched sample merges as the same script.
 const WELCOME_STAMP = Date.UTC(2026, 8, 21);
-export const WELCOME = `Welcome to Sapphire Prompter.
+export const WELCOME = `Welcome to Sapphire.
 
 This is a sample script. Open Scripts to create your own, or tap the pencil to edit this one.
 
