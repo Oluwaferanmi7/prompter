@@ -2104,3 +2104,20 @@ input[type='range']::-moz-range-thumb {
   font-family: var(--f-head);
   font-size: 24px;
 }
+.cam-lib.has-thumb {
+  background-size: cover;
+  background-position: center;
+  border: 2px solid #eaf3ff;
+  border-radius: 12px;
+}
+.cam-lib.has-thumb svg {
+  display: none;
+}
+.save-sheet .save-hint {
+  margin: 4px 10px 8px;
+  text-align: center;
+}
+.save-sheet [data-s='save'] {
+  background: var(--yellow);
+  color: var(--on-yellow);
+}

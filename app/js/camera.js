@@ -48,6 +48,7 @@ export function createCamera({ engine, log, toast }) {
   const recBtn = ui.querySelector('[data-cam=rec]');
   const clock = ui.querySelector('[data-cam=time]');
   const flipBtn = ui.querySelector('[data-cam=flip]');
+  const libBtn = ui.querySelector('[data-cam=list]');
   let stream = null;
   let facing = store.getPrefs().camFacing || 'user';
   let active = false;
@@ -105,7 +106,7 @@ export function createCamera({ engine, log, toast }) {
       await r.pending;
       await recs.end(r.id, { ended: Date.now() });
       update();
-      toast('Saved. Recordings → Share to save it to Photos or AirDrop.');
+      offerSave(r.id);
     };
     mr.start(1000);
     const set = stream.getVideoTracks()[0]?.getSettings?.() || {};
@@ -118,6 +119,7 @@ export function createCamera({ engine, log, toast }) {
   }
   function stop() {
     if (!rec || rec.mr.state === 'inactive') return;
+    thumb();
     log.event('rec', { on: false, id: rec.id, ms: Date.now() - rec.started });
     rec.mr.stop();
     engine.pause();
@@ -149,12 +151,67 @@ export function createCamera({ engine, log, toast }) {
   // Tapping the camera area shouldn't toggle the teleprompter bar underneath.
   ui.addEventListener('pointerdown', (e) => e.target.closest('[data-cam]') && e.stopPropagation());
 
+  // ------------------------------------------------------------------ after a take
+  // The library button shows the last take, like the iPhone Camera app.
+  function thumb() {
+    if (!video.videoWidth) return;
+    const c = document.createElement('canvas');
+    const s = 96 / Math.min(video.videoWidth, video.videoHeight);
+    c.width = Math.round(video.videoWidth * s);
+    c.height = Math.round(video.videoHeight * s);
+    const g = c.getContext('2d');
+    if (video.classList.contains('front')) {
+      g.translate(c.width, 0);
+      g.scale(-1, 1);
+    }
+    g.drawImage(video, 0, 0, c.width, c.height);
+    libBtn.style.backgroundImage = `url(${c.toDataURL('image/jpeg', 0.7)})`;
+    libBtn.classList.add('has-thumb');
+  }
+
+  // Web apps can't write into Photos directly: the share sheet's "Save Video" does it. The
+  // file is prepared before the button shows, so the tap opens the sheet straight away.
+  async function share(f, title) {
+    try {
+      if (navigator.canShare?.({ files: [f] })) {
+        await navigator.share({ files: [f], title });
+        return true;
+      }
+    } catch (err) {
+      if (err?.name === 'AbortError') return false;
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(f);
+    a.download = f.name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+    return true;
+  }
+  async function offerSave(id) {
+    const f = await recs.file(id);
+    if (!f || !active) return toast('Saved in Recordings.');
+    view.querySelector('.save-sheet')?.remove();
+    const sheet = document.createElement('div');
+    sheet.className = 'modal save-sheet';
+    sheet.innerHTML = `<div class="modal-card actions-card"><div class="a-title">Take saved in the app · ${mb(f.size)}</div>
+      <button data-s="save">Save to Photos</button><button data-s="later" class="cancel">Later</button>
+      <p class="muted small save-hint">Opens the share sheet: choose <b>Save Video</b>. It also stays in Recordings until you delete it.</p></div>`;
+    sheet.addEventListener('click', async (e) => {
+      const s = e.target.closest('[data-s]')?.dataset.s;
+      if (e.target === sheet || s === 'later') return sheet.remove();
+      if (s === 'save') {
+        if (await share(f, 'Sapphire take')) sheet.remove();
+      }
+    });
+    view.appendChild(sheet);
+  }
+
   // ------------------------------------------------------------------ recordings list
   async function openList() {
     const sheet = document.createElement('div');
     sheet.className = 'modal';
     sheet.innerHTML = `<div class="modal-card logs-card"><div class="a-title">Recordings</div>
-      <p class="muted small">Saved on this device. Share to save to Photos, AirDrop or Drive, then delete here to free space.</p>
+      <p class="muted small">Kept in the app on this device. <b>Save / Share</b> → Save Video puts it in Photos (or AirDrop, Files, Drive). Delete here afterwards to free space.</p>
       <ul class="log-list"><li class="muted small">Loading…</li></ul><button class="cancel">Close</button></div>`;
     sheet.querySelector('.cancel').onclick = () => sheet.remove();
     sheet.addEventListener('click', (e) => e.target === sheet && sheet.remove());
@@ -167,22 +224,15 @@ export function createCamera({ engine, log, toast }) {
       const li = document.createElement('li');
       li.className = 'rec-item';
       li.innerHTML = `<div class="rec-txt"><div class="si-title"><span></span></div><div class="si-meta"></div></div>
-        <button class="btn small primary" data-r="share">Share</button><button class="btn small ghost" data-r="del">Delete</button>`;
+        <button class="btn small primary" data-r="share">Save / Share</button><button class="btn small ghost" data-r="del">Delete</button>`;
       li.querySelector('.si-title span').textContent = r.title;
       li.querySelector('.si-meta').textContent = `${new Date(r.started).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · ${fmt(r.ended - r.started)} · ${mb(r.bytes)}${r.recovered ? ' · recovered' : ''}`;
+      // Prepared up front so the tap opens the share sheet straight away.
+      const ready = recs.file(r.id);
       li.querySelector('[data-r=share]').onclick = async () => {
-        const f = await recs.file(r.id);
+        const f = await ready;
         if (!f) return toast('That recording is gone.');
-        try {
-          if (navigator.canShare?.({ files: [f] })) return await navigator.share({ files: [f], title: r.title });
-        } catch (err) {
-          if (err?.name === 'AbortError') return;
-        }
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(f);
-        a.download = f.name;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+        share(f, r.title);
       };
       li.querySelector('[data-r=del]').onclick = async () => {
         if (!confirm(`Delete this recording of “${r.title}” from this device? Make sure you've saved it somewhere first.`)) return;
