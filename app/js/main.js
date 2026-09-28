@@ -7,6 +7,8 @@ import * as store from './store.js';
 import { createTakeLog } from './takelog.js';
 import { createHome } from './home.js';
 import { createCloud } from './cloud.js';
+import { createCamera } from './camera.js';
+import { createHub } from './hub.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -31,6 +33,8 @@ const settings = store.getSettings();
 let prompter;
 let remote;
 let home;
+let camera;
+let hubView;
 const log = createTakeLog({ code: store.getMyCode() });
 const cloud = createCloud({ toast, onChange: () => home?.refresh() });
 
@@ -325,6 +329,8 @@ lib.subscribe((change) => {
 const showRemote = () => (location.hash = '#/remote');
 const showLocal = () => (location.hash = '');
 const showHome = () => (location.hash = '#/home');
+const showCamera = () => (location.hash = '#/camera');
+const showHub = () => (location.hash = '#/hub');
 
 prompter = createPrompter({
   link,
@@ -341,6 +347,8 @@ prompter = createPrompter({
   onVoiceStatus: (s, detail) => link.sendToController({ t: 'voice-status', s, detail }),
 });
 remote = createRemote({ link, hub, toast, onHome: showHome });
+camera = createCamera({ engine: prompter.engine, log, toast });
+hubView = createHub({ toast, onHome: showHome });
 home = createHome({
   link,
   hub,
@@ -348,6 +356,8 @@ home = createHome({
   toast,
   summary: () => roster.summary(),
   onTeleprompter: showLocal,
+  onCamera: showCamera,
+  onHub: showHub,
   onRemote: showRemote,
   onScripts() {
     showLocal();
@@ -358,7 +368,13 @@ home = createHome({
 
 function route() {
   const hash = location.hash;
-  const screen = hash.startsWith('#/remote') ? 'remote' : hash.startsWith('#/home') ? 'home' : 'local';
+  const screen = hash.startsWith('#/remote') ? 'remote' : hash.startsWith('#/home') ? 'home' : hash.startsWith('#/camera') ? 'camera' : hash.startsWith('#/hub') ? 'hub' : 'local';
+  if (screen === 'hub') hubView.enter();
+  else hubView.leave();
+  if (screen === 'camera') {
+    prompter.controls.closePanel();
+    camera.enter();
+  } else camera.leave();
   if (screen === 'remote') remote.enter();
   else remote.leave();
   if (screen === 'home') home.enter();
@@ -384,6 +400,7 @@ if (signin) {
   cloud.finishSignIn(signin[1]);
 }
 if (!location.hash) {
+  // (Camera mode isn't reopened by itself: it would switch the camera on at launch.)
   if (lastScreen === 'remote' && store.getRemoteCode()) history.replaceState(null, '', '#/remote');
   else if (lastScreen !== 'local') history.replaceState(null, '', '#/home');
 }

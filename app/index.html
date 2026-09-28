@@ -27,6 +27,8 @@
 
     <!-- ============================ THIS PHONE'S TELEPROMPTER ============================ -->
     <section id="prompter" class="view prompter">
+      <!-- "Record yourself": the camera sits behind the script -->
+      <video class="cam-video" id="p-cam" playsinline muted autoplay hidden></video>
       <div class="stage" id="p-stage">
         <div class="scroller" id="p-scroller">
           <div class="p-content" id="p-content"></div>
@@ -45,6 +47,12 @@
         <button class="chip" id="p-remote" hidden><i></i><span></span> ›</button>
       </div>
       <div class="heard" id="p-heard" hidden></div>
+      <div class="cam-ui" id="p-camui" hidden>
+        <div class="cam-time" data-cam="time" hidden>0:00</div>
+        <button class="cam-btn" data-cam="list" aria-label="Recordings"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="13" height="14" rx="2" /><path d="M16 10l5-3v10l-5-3" /></svg></button>
+        <button class="cam-rec" data-cam="rec" aria-label="Record"><span></span></button>
+        <button class="cam-btn" data-cam="flip" aria-label="Switch camera"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><path d="M9 13a3 3 0 0 1 5-2M15 13a3 3 0 0 1-5 2M14 9v2h-2M10 17v-2h2" /></svg></button>
+      </div>
       <!-- control bar + panel are mounted here by controls.js -->
     </section>
 
@@ -71,6 +79,9 @@
 
     <!-- ============================ HOME (what is this device doing?) ============================ -->
     <section id="home" class="view home" hidden></section>
+
+    <!-- ============================ HUB (desktop app: cameras + mics on this computer) ============================ -->
+    <section id="hub" class="view hub" hidden></section>
 
     <div class="toast" id="toast" hidden></div>
   </body>

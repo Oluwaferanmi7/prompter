@@ -3,15 +3,18 @@
 // remote phone goes straight back to controlling; Home is one tap away.
 import * as lib from './library.js';
 import * as store from './store.js';
+import { hubAvailable } from './hub.js';
 
 const $ = (id) => document.getElementById(id);
 const ICON = {
   tele: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M7 9h10M7 12h7M9 21h6M12 17v4"/></svg>',
   remote: '<svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="3"/><path d="M11 6l3 2-3 2z" fill="currentColor"/><path d="M10 14h4M10 17h4"/></svg>',
   viewer: '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  hub: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4M7 8h4M7 11h6"/><circle cx="16" cy="9.5" r="1.5"/></svg>',
+  cam: '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3"/><path d="M6 10h6M6 13h4"/></svg>',
 };
 
-export function createHome({ link, hub, cloud, summary, toast, onTeleprompter, onScripts, onRemote, onLogs }) {
+export function createHome({ link, hub, cloud, summary, toast, onTeleprompter, onCamera, onHub, onScripts, onRemote, onLogs }) {
   const view = $('home');
   view.innerHTML = `
     <div class="home-in">
@@ -20,6 +23,14 @@ export function createHome({ link, hub, cloud, summary, toast, onTeleprompter, o
       <button class="mode" data-m="tele">
         <span class="m-ico">${ICON.tele}</span>
         <span class="m-txt"><b>Teleprompter</b><small data-sub="tele"></small></span><span class="m-go">›</span>
+      </button>
+      ${hubAvailable() ? `<button class="mode hub-card" data-m="hub">
+        <span class="m-ico">${ICON.hub}</span>
+        <span class="m-txt"><b>Hub</b><small>The cameras and mics plugged into this computer</small></span><span class="m-go">›</span>
+      </button>` : ''}
+      <button class="mode" data-m="cam">
+        <span class="m-ico">${ICON.cam}</span>
+        <span class="m-txt"><b>Record yourself</b><small>Camera with your script on screen, saved on this device</small></span><span class="m-go">›</span>
       </button>
       <button class="mode" data-m="remote">
         <span class="m-ico">${ICON.remote}</span>
@@ -92,6 +103,8 @@ export function createHome({ link, hub, cloud, summary, toast, onTeleprompter, o
       return askCode(change.dataset.change);
     }
     if (m === 'tele') onTeleprompter();
+    else if (m === 'cam') onCamera();
+    else if (m === 'hub') onHub();
     else if (m) {
       // Remote / Viewer: straight in if we know which device, otherwise ask for its code.
       if (link.targetCode) go(m);

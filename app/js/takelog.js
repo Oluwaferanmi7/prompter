@@ -27,6 +27,8 @@
 //     control  {code}                      control moved to this phone (take over)
 //     hidden / visible                     app went to the background / came back
 //     close    {}                          another script was opened
+//     rec      {on, id, mime, w, h, ms}     "Record yourself" started / stopped recording on this
+//                                           device (same clock as the video: rec on = video 0:00)
 //   Positions: a = [paragraph, fraction 0..1], w/fw/tw = word index in the script (approx).
 //   Paragraphs are the script's lines (split on "\n"), numbered from 0.
 import { NS } from './store.js';
