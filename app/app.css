@@ -1993,3 +1993,10 @@ input[type='range']::-moz-range-thumb {
   margin-top: 24px;
   text-align: center;
 }
+.hub-sub {
+  grid-column: 1 / -1;
+  margin: 8px 2px 0;
+}
+.hub-mic.bad .hub-meter {
+  outline: 1px solid var(--bad);
+}

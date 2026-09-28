@@ -45,17 +45,77 @@ export function createHub({ toast, onHome }) {
     cancelAnimationFrame(raf);
     streams.forEach((s) => s.getTracks().forEach((t) => t.stop()));
     streams = [];
+    open?.forEach((st) => st.getTracks().forEach((t) => t.stop()));
+    open?.clear();
     meters.length = 0;
     audioCtx?.close().catch(() => {});
     audioCtx = null;
   }
 
+  // Studio computers are full of virtual devices (NDI, vMix, OBS, Voicemeeter…). They're
+  // listed but off by default; the real camera/mic comes first. Opening a virtual camera
+  // with nothing feeding it can hang, so every device gets a time limit and only ticked
+  // devices are opened at all.
+  const VIRTUAL = /\b(NDI|vMix|OBS|Virtual|Voicemeeter|VB-Audio|VAIO|Snap Camera|ManyCam|XSplit|Streamlabs|Camo|Iriun|DroidCam)\b/i;
+  const withTimeout = (p, ms) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(Object.assign(new Error('timeout'), { name: 'Timeout' })), ms))]);
+  const open = new Map(); // deviceId -> MediaStream
+
+  function stopDevice(id) {
+    open.get(id)?.getTracks().forEach((t) => t.stop());
+    open.delete(id);
+    const i = meters.findIndex((m) => m.id === id);
+    if (i >= 0) meters.splice(i, 1);
+  }
+
+  async function startCam(d, tile) {
+    const res = tile.querySelector('.hub-res');
+    res.textContent = 'Opening…';
+    tile.classList.remove('bad');
+    try {
+      const s = await withTimeout(
+        navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: d.deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } }),
+        10000
+      );
+      if (!active || !tile.querySelector('input[type=checkbox]').checked) return s.getTracks().forEach((t) => t.stop());
+      open.set(d.deviceId, s);
+      tile.querySelector('video').srcObject = s;
+      const st = s.getVideoTracks()[0].getSettings();
+      res.textContent = `${st.width}×${st.height} · ${Math.round(st.frameRate || 0)} fps`;
+    } catch (err) {
+      res.textContent = err?.name === 'Timeout' ? 'No signal' : err?.name === 'NotReadableError' ? 'In use by another app' : "Can't open";
+      tile.classList.add('bad');
+    }
+  }
+
+  async function startMic(d, row) {
+    try {
+      const s = await withTimeout(navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: d.deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false } }), 10000);
+      if (!active || !audioCtx || !row.querySelector('input[type=checkbox]').checked) return s.getTracks().forEach((t) => t.stop());
+      open.set(d.deviceId, s);
+      const an = audioCtx.createAnalyser();
+      an.fftSize = 1024;
+      audioCtx.createMediaStreamSource(s).connect(an);
+      meters.push({ id: d.deviceId, an, bar: row.querySelector('.hub-meter span'), buf: new Float32Array(an.fftSize), level: 0 });
+      row.classList.remove('bad');
+    } catch {
+      row.classList.add('bad');
+    }
+  }
+
+  function group(title, items, render, host) {
+    if (!items.length) return;
+    if (title) host.insertAdjacentHTML('beforeend', `<div class="hub-sub muted small">${title}</div>`);
+    items.forEach(render);
+  }
+
   async function scan() {
     closeAll();
+    open.forEach((st) => st.getTracks().forEach((t) => t.stop()));
+    open.clear();
     vids.innerHTML = mics.innerHTML = '<p class="muted small">Looking…</p>';
     try {
-      // One permission prompt reveals device names; then each device opens on its own.
-      const probe = await navigator.mediaDevices.getUserMedia({ video: true, audio: true }).catch(() => navigator.mediaDevices.getUserMedia({ audio: true }));
+      // A microphone request is enough to reveal every device's name; no camera gets opened here.
+      const probe = await withTimeout(navigator.mediaDevices.getUserMedia({ audio: true }), 10000);
       probe.getTracks().forEach((t) => t.stop());
     } catch {
       vids.innerHTML = mics.innerHTML = '<p class="muted small">No access. Allow cameras and microphones for Sapphire.</p>';
@@ -64,73 +124,75 @@ export function createHub({ toast, onHome }) {
     if (!active) return;
     const devices = await navigator.mediaDevices.enumerateDevices();
     const P = prefs();
+    const isVirtual = (d) => VIRTUAL.test(d.label || '');
     const cams = devices.filter((d) => d.kind === 'videoinput');
     const ins = devices.filter((d) => d.kind === 'audioinput' && d.deviceId !== 'default' && d.deviceId !== 'communications');
     vids.innerHTML = cams.length ? '' : '<p class="muted small">No cameras found. Plug in a camera or capture card, then Refresh.</p>';
     mics.innerHTML = ins.length ? '' : '<p class="muted small">No microphones found.</p>';
+    audioCtx = new AudioContext();
 
-    cams.forEach((d, i) => {
+    let camNo = 0;
+    const camTile = (d) => {
+      const i = camNo++;
       const pick = P.cams[d.deviceId] || {};
+      const on = pick.use ?? !isVirtual(d);
       const tile = document.createElement('div');
-      tile.className = 'hub-cam' + (pick.use === false ? ' off' : '');
-      tile.innerHTML = `<div class="hub-video"><video muted playsinline autoplay></video><span class="hub-res"></span></div>
+      tile.className = 'hub-cam' + (on ? '' : ' off');
+      tile.innerHTML = `<div class="hub-video"><video muted playsinline autoplay></video><span class="hub-res">${on ? '' : 'Off'}</span></div>
         <div class="hub-row"><input class="hub-name" maxlength="30" placeholder="Camera ${i + 1}"><label class="hub-use"><input type="checkbox"> Use</label></div>
         <div class="muted small hub-dev">${esc(d.label || 'Camera ' + (i + 1))}</div>`;
       const name = tile.querySelector('.hub-name');
       const use = tile.querySelector('input[type=checkbox]');
       name.value = pick.name || '';
-      use.checked = pick.use !== false;
+      use.checked = on;
       name.onchange = () => savePick('cams', d.deviceId, { name: name.value.trim(), label: d.label });
       use.onchange = () => {
         savePick('cams', d.deviceId, { use: use.checked, label: d.label });
         tile.classList.toggle('off', !use.checked);
+        if (use.checked) startCam(d, tile);
+        else {
+          stopDevice(d.deviceId);
+          tile.querySelector('video').srcObject = null;
+          tile.querySelector('.hub-res').textContent = 'Off';
+          tile.classList.remove('bad');
+        }
       };
       vids.appendChild(tile);
-      navigator.mediaDevices
-        .getUserMedia({ video: { deviceId: { exact: d.deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } })
-        .then((s) => {
-          if (!active) return s.getTracks().forEach((t) => t.stop());
-          streams.push(s);
-          tile.querySelector('video').srcObject = s;
-          const st = s.getVideoTracks()[0].getSettings();
-          tile.querySelector('.hub-res').textContent = `${st.width}×${st.height} · ${Math.round(st.frameRate || 0)} fps`;
-        })
-        .catch((err) => {
-          tile.querySelector('.hub-res').textContent = err?.name === 'NotReadableError' ? 'In use by another app' : "Can't open";
-          tile.classList.add('bad');
-        });
-    });
+      if (on) startCam(d, tile);
+    };
+    group('', cams.filter((d) => !isVirtual(d)), camTile, vids);
+    group('Virtual cameras (from NDI, vMix, OBS…): off unless you tick them', cams.filter(isVirtual), camTile, vids);
 
-    audioCtx = new AudioContext();
-    ins.forEach((d, i) => {
+    let micNo = 0;
+    const micRow = (d) => {
+      const i = micNo++;
       const pick = P.mics[d.deviceId] || {};
+      const on = pick.use ?? !isVirtual(d);
       const row = document.createElement('div');
-      row.className = 'hub-mic' + (pick.use === false ? ' off' : '');
+      row.className = 'hub-mic' + (on ? '' : ' off');
       row.innerHTML = `<label class="hub-use"><input type="checkbox"></label>
         <div class="hub-mic-txt"><input class="hub-name" maxlength="30" placeholder="Mic ${i + 1}"><div class="muted small">${esc(d.label || 'Microphone ' + (i + 1))}</div></div>
         <div class="hub-meter"><span></span></div>`;
       const name = row.querySelector('.hub-name');
       const use = row.querySelector('input[type=checkbox]');
       name.value = pick.name || '';
-      use.checked = pick.use !== false;
+      use.checked = on;
       name.onchange = () => savePick('mics', d.deviceId, { name: name.value.trim(), label: d.label });
       use.onchange = () => {
         savePick('mics', d.deviceId, { use: use.checked, label: d.label });
         row.classList.toggle('off', !use.checked);
+        if (use.checked) startMic(d, row);
+        else {
+          stopDevice(d.deviceId);
+          row.querySelector('.hub-meter span').style.width = '0%';
+        }
       };
       mics.appendChild(row);
-      navigator.mediaDevices
-        .getUserMedia({ audio: { deviceId: { exact: d.deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
-        .then((s) => {
-          if (!active || !audioCtx) return s.getTracks().forEach((t) => t.stop());
-          streams.push(s);
-          const an = audioCtx.createAnalyser();
-          an.fftSize = 1024;
-          audioCtx.createMediaStreamSource(s).connect(an);
-          meters.push({ an, bar: row.querySelector('.hub-meter span'), buf: new Float32Array(an.fftSize), level: 0 });
-        })
-        .catch(() => row.classList.add('bad'));
-    });
+      if (on) startMic(d, row);
+    };
+    group('', ins.filter((d) => !isVirtual(d)), micRow, mics);
+    group('Virtual inputs (Voicemeeter, NDI…): off unless you tick them', ins.filter(isVirtual), micRow, mics);
+
     const draw = () => {
       raf = requestAnimationFrame(draw);
       for (const m of meters) {
