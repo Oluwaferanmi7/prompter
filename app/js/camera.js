@@ -16,6 +16,48 @@ const fmt = (ms) => {
 };
 const mb = (b) => (b >= 1e9 ? (b / 1e9).toFixed(1) + ' GB' : Math.max(1, Math.round(b / 1e6)) + ' MB');
 
+// The voice as recorded. The phone's call processing (auto volume, echo and noise removal)
+// stays off so the voice sounds natural, but that leaves the raw mic very quiet (≈ −44 LUFS
+// on a real take) and in one ear only (mono mic saved as left-only stereo). So: take the
+// mic's first channel, turn it up a fixed +12 dB like an input knob, catch only the loudest
+// peaks with a limiter (ceiling ≈ −3 dBFS, so a shout can't clip), and put it in both ears.
+// Final loudness is set in the edit. The limiter adds ~5 dB of its own below the threshold
+// (Web Audio's automatic make-up gain), so the knob itself is 12 − 5.13 dB.
+const LIMIT_AT = -9; // dBFS, ratio 20
+const MAKEUP_DB = 0.6 * -LIMIT_AT * (1 - 1 / 20); // the Web Audio spec's make-up formula
+const KNOB_DB = 12 - MAKEUP_DB;
+let voiceCtx = null; // one AudioContext, reused (iOS allows only a few)
+function voiceTrack(stream) {
+  const mic = stream.getAudioTracks()[0];
+  if (!mic) return { track: null, done() {} };
+  try {
+    voiceCtx ||= new AudioContext();
+    voiceCtx.resume?.().catch(() => {});
+    const ctx = voiceCtx;
+    const input = ctx.createMediaStreamSource(new MediaStream([mic]));
+    const split = ctx.createChannelSplitter(2);
+    const knob = ctx.createGain();
+    knob.gain.value = 10 ** (KNOB_DB / 20);
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = LIMIT_AT;
+    limiter.knee.value = 0;
+    limiter.ratio.value = 20;
+    limiter.attack.value = 0.001;
+    limiter.release.value = 0.15;
+    const both = ctx.createChannelMerger(2);
+    const out = ctx.createMediaStreamDestination();
+    input.connect(split);
+    split.connect(knob, 0);
+    knob.connect(limiter);
+    limiter.connect(both, 0, 0);
+    limiter.connect(both, 0, 1);
+    both.connect(out);
+    return { track: out.stream.getAudioTracks()[0], done: () => input.disconnect() };
+  } catch {
+    return { track: mic, done() {} }; // no Web Audio: record the mic as it comes
+  }
+}
+
 // Test bench only (?bench=…&fakecam): a moving test pattern and a tone instead of a real camera.
 export function fakeStream() {
   const c = Object.assign(document.createElement('canvas'), { width: 720, height: 1280 });
@@ -52,7 +94,7 @@ export function createCamera({ engine, log, toast }) {
   let stream = null;
   let facing = store.getPrefs().camFacing || 'user';
   let active = false;
-  let rec = null; // { mr, id, started, n, pending }
+  let rec = null; // { mr, id, started, n, pending, voice }
   let tick = 0;
 
   function stopStream() {
@@ -86,14 +128,16 @@ export function createCamera({ engine, log, toast }) {
     if (rec || !stream) return;
     const mime = TYPES.find((t) => window.MediaRecorder?.isTypeSupported?.(t));
     if (!mime) return toast("This browser can't record video.");
+    const voice = voiceTrack(stream); // first, while the Record tap still counts as a tap (iOS audio rule)
     navigator.storage?.persist?.().catch(() => {});
     const est = await navigator.storage?.estimate?.().catch(() => null);
     if (est && est.quota - est.usage < 300e6) toast('Low storage: long takes may not fit. Share and delete old recordings.');
     const s = lib.get(engine.script?.id);
     const id = store.uid();
     const started = Date.now();
-    const mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 20_000_000, audioBitsPerSecond: 128_000 });
-    rec = { mr, id, started, n: 0, pending: Promise.resolve() };
+    const tracks = [...stream.getVideoTracks(), ...(voice.track ? [voice.track] : [])];
+    const mr = new MediaRecorder(new MediaStream(tracks), { mimeType: mime, videoBitsPerSecond: 20_000_000, audioBitsPerSecond: 128_000 });
+    rec = { mr, id, started, n: 0, pending: Promise.resolve(), voice };
     await recs.begin({ id, started, ended: started, mime, title: s?.title || 'Take', scriptId: s?.id || null });
     mr.ondataavailable = (e) => {
       if (!e.data?.size) return;
@@ -103,6 +147,7 @@ export function createCamera({ engine, log, toast }) {
     mr.onstop = async () => {
       const r = rec;
       rec = null;
+      r.voice.done();
       await r.pending;
       await recs.end(r.id, { ended: Date.now() });
       update();
