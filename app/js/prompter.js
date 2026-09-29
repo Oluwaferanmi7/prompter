@@ -9,7 +9,7 @@ import { createVoice } from './voice.js';
 
 const $ = (id) => document.getElementById(id);
 
-export function createPrompter({ link, log, roster, hub, settings, toast, onOpenRemote, onHome, onState, onSettings, onSelect, onVoiceStatus }) {
+export function createPrompter({ link, log, roster, hub, settings, toast, onOpenRemote, onHome, onState, onSettings, onSelect, onVoiceStatus, keysOn = () => true }) {
   const view = $('prompter');
   const stage = $('p-stage');
   const hudTop = $('p-top');
@@ -212,9 +212,10 @@ export function createPrompter({ link, log, roster, hub, settings, toast, onOpen
     { passive: false }
   );
 
-  // Keyboard + Bluetooth page-turner / presentation clickers.
+  // Keyboard + Bluetooth page-turner / presentation clickers. Only while this teleprompter
+  // is what's on screen: on a laptop's remote screen, Space must not also start this one.
   document.addEventListener('keydown', (e) => {
-    if (view.hidden || e.target.matches?.('input, textarea')) return;
+    if (view.hidden || !keysOn() || e.target.matches?.('input, textarea')) return;
     const k = e.key;
     if (k === ' ' || k === 'Enter' || k === 'MediaPlayPause') engine.toggle();
     else if (k === 'ArrowDown') ctl.nudge(1);
@@ -254,12 +255,31 @@ export function createPrompter({ link, log, roster, hub, settings, toast, onOpen
     controls.update();
   }
 
+  // The Hub's Studio can show this teleprompter in its side panel (a laptop reading its own
+  // script while recording on a webcam). The stage moves there and back; the engine, the
+  // take log and any connected remote carry on as if nothing happened.
+  let homeSpot = null;
+  function attach(el) {
+    if (stage.parentNode === el) return;
+    if (!homeSpot) homeSpot = { parent: stage.parentNode, next: stage.nextSibling };
+    el.appendChild(stage);
+    engine.styleHost(el);
+  }
+  function detach() {
+    if (!homeSpot) return;
+    homeSpot.parent.insertBefore(stage, homeSpot.next);
+    homeSpot = null;
+    engine.styleHost(null);
+  }
+
   return {
     engine,
     ctl,
     controls,
     linkStatus,
     voiceResync,
+    attach,
+    detach,
     // Called when a script in the library changes (local edit, remote edit or merge).
     scriptChanged(id) {
       if (engine.script && id === engine.script.id) {

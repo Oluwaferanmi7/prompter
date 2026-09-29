@@ -275,7 +275,9 @@ function createWindow() {
               mics: [...document.querySelectorAll('.hub-mic')].map(m => m.querySelector('.muted').textContent + ' | meter ' + m.querySelector('.hub-meter span').style.width) };
             if (${SELFTEST_RECORD}) {
               document.querySelector('#hub [data-h=next]')?.click();
-              await w(2500);
+              await w(1500);
+              document.querySelector('#hub [data-mode=teleprompter]')?.click(); // record with this computer as the teleprompter
+              await w(1000);
               r.studio = document.querySelector('#hub .hub-studio')?.innerText.slice(0, 300);
               document.querySelector('#hub [data-st=rec]')?.click();
               await w(4500);

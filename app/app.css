@@ -2234,6 +2234,60 @@ input[type='range']::-moz-range-thumb {
   flex: 1;
   margin: 0;
 }
+/* Teleprompter mode: this computer's own stage, never mirrored here (read it straight). */
+.st-tp > .stage {
+  --mx: 1;
+  --my: 1;
+  border-radius: 12px;
+}
+.st-tp:has(> .stage) {
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--p-bg, #000);
+}
+.st-modes {
+  margin-top: 0;
+}
+.st-pick {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.st-pick[hidden],
+.st-ctl[hidden],
+.st-ctl [hidden] {
+  display: none;
+}
+.st-ctl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.st-ctl .btn {
+  min-width: 36px;
+}
+.st-ctl.locked > :not([data-c='takeover']) {
+  opacity: 0.4;
+}
+.st-speed,
+.st-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.st-speed [data-st='speed'] {
+  min-width: 2.2em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 .st-ask {
   display: flex;
   flex-direction: column;

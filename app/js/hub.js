@@ -26,7 +26,7 @@ const SECTIONS = [
   ['vmics', 'Virtual inputs (Voicemeeter, NDI…)', false],
 ];
 
-export function createHub({ link, hub, remote, toast, onHome }) {
+export function createHub({ link, hub, remote, prompter, log, toast, onHome }) {
   const view = $('hub');
   view.innerHTML = `
     <header class="hub-top">
@@ -292,7 +292,7 @@ export function createHub({ link, hub, remote, toast, onHome }) {
     const s = selection();
     view.querySelector('[data-h-sum]').textContent = `${s.cams.length} camera${s.cams.length === 1 ? '' : 's'} · ${s.mics.length} mic${s.mics.length === 1 ? '' : 's'} selected`;
   }
-  const studio = createStudio({ root: view.querySelector('.hub-studio'), link, hub, remote, toast, audioCtx: () => audioCtx });
+  const studio = createStudio({ root: view.querySelector('.hub-studio'), link, hub, remote, prompter, log, toast, audioCtx: () => audioCtx });
   function setMode(m) {
     if (m === 'studio' && studio.recording) return;
     mode = m;
@@ -334,6 +334,10 @@ export function createHub({ link, hub, remote, toast, onHome }) {
       closeAll();
     },
     linkStatus: () => studio.linkStatus(),
+    // Studio is showing this computer's own teleprompter (so the keyboard drives it).
+    get prompterShown() {
+      return active && mode === 'studio' && studio.ownPrompter;
+    },
     // A phone camera called in (see link.onCall). Answer without sending anything back.
     onCall(code, call) {
       phones.get(code)?.call?.close?.();

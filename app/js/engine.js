@@ -23,6 +23,7 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
   let lastPosLog = 0;
   let dragFrom = null;
   let wasMoving = false;
+  let host = null; // somewhere else the stage is shown (the Hub's Studio): gets the same look
   const ev = (type, data) => onEvent?.(type, data);
 
   const cueY = () => stage.clientHeight * settings.cuePos;
@@ -34,17 +35,19 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
     const a = keep ? anchorAt(y, m) : null;
     Object.assign(settings, next);
     const th = THEMES[settings.theme] || THEMES.white;
-    const s = view.style;
-    s.setProperty('--p-size', settings.fontSize + 'px');
-    s.setProperty('--p-lh', settings.lineHeight);
-    s.setProperty('--p-margin', settings.margin);
-    s.setProperty('--p-align', settings.align);
-    s.setProperty('--p-cue', settings.cuePos);
-    s.setProperty('--p-fg', th.fg);
-    s.setProperty('--p-bg', th.bg);
-    s.setProperty('--p-cuecolor', th.cue);
-    s.setProperty('--mx', settings.mirrorX ? -1 : 1);
-    s.setProperty('--my', settings.mirrorY ? -1 : 1);
+    for (const el of host ? [view, host] : [view]) {
+      const s = el.style;
+      s.setProperty('--p-size', settings.fontSize + 'px');
+      s.setProperty('--p-lh', settings.lineHeight);
+      s.setProperty('--p-margin', settings.margin);
+      s.setProperty('--p-align', settings.align);
+      s.setProperty('--p-cue', settings.cuePos);
+      s.setProperty('--p-fg', th.fg);
+      s.setProperty('--p-bg', th.bg);
+      s.setProperty('--p-cuecolor', th.cue);
+      s.setProperty('--mx', settings.mirrorX ? -1 : 1);
+      s.setProperty('--my', settings.mirrorY ? -1 : 1);
+    }
     cue.classList.toggle('hide', !settings.showCue);
     remeasure(a);
     markDirty(true);
@@ -215,6 +218,11 @@ export function createEngine({ view, stage, scroller, content, cue, countEl, set
   }
 
   return {
+    // The stage was moved into el (or back, with null): style it the same way.
+    styleHost(el) {
+      host = el;
+      applySettings({});
+    },
     get script() {
       return script;
     },

@@ -8,6 +8,10 @@
 // can be scrubbed, mic WebMs turned into 32-bit float WAVs (+ MP3 if switched on). Nothing is
 // re-encoded; the recorder's own files are kept in the take's Originals folder.
 //
+// The side panel has three modes: Teleprompter (this computer shows the script, e.g. to
+// read while recording on a webcam; phones can still connect to it as remotes), Remote
+// (this computer drives the teleprompter phone) and Viewer (follow only).
+//
 // This first version records with the app's own engine (MediaRecorder) so recording and
 // the live previews share the same device handles. Phones show as previews; recording
 // them (full quality on the phone, sent over after Stop) is the next step.
@@ -24,7 +28,7 @@ const pick = (types) => types.find((t) => window.MediaRecorder?.isTypeSupported?
 const VIDEO = ['video/mp4;codecs=avc1.640028', 'video/mp4', 'video/webm;codecs=h264', 'video/webm;codecs=vp9', 'video/webm'];
 const AUDIO = ['audio/webm;codecs=pcm', 'audio/webm;codecs=opus', 'audio/webm']; // PCM = lossless
 
-export function createStudio({ root, link, hub, remote, toast, audioCtx }) {
+export function createStudio({ root, link, hub, remote, prompter, log, toast, audioCtx }) {
   root.innerHTML = `
     <div class="st-main">
       <div class="st-cams" data-st="cams"></div>
@@ -32,10 +36,25 @@ export function createStudio({ root, link, hub, remote, toast, audioCtx }) {
     </div>
     <aside class="st-side">
       <div class="st-side-head"><span>Teleprompter</span><button class="pill" data-st="tpcode"><span class="dot"></span><span data-st="tpstatus">Not connected</span></button></div>
+      <div class="seg st-modes" data-st="modes">
+        <button data-mode="teleprompter" title="This computer shows the script">Teleprompter</button>
+        <button data-mode="remote" title="Control the teleprompter phone from here">Remote</button>
+        <button data-mode="viewer" title="Follow the teleprompter phone">Viewer</button>
+      </div>
+      <select class="st-pick" data-st="pick" aria-label="Script" hidden></select>
       <div class="st-tp" data-st="tp"></div>
       <div class="st-ask" data-st="ask" hidden>
         <p class="muted small">Enter the teleprompter phone's code to follow the script here.</p>
         <input class="code-input" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD">
+      </div>
+      <div class="st-ctl" data-st="ctl">
+        <button class="btn ghost small" data-c="top" title="Back to the start (Home)">⤒</button>
+        <button class="btn ghost small" data-c="back" title="Previous paragraph (Page Up)">‹</button>
+        <button class="btn primary small st-play" data-c="play" title="Play / pause (Space)">▶</button>
+        <button class="btn ghost small" data-c="fwd" title="Next paragraph (Page Down)">›</button>
+        <span class="st-speed"><button class="btn ghost small" data-c="slower" title="Slower (−)">−</button><span data-st="speed">6</span><button class="btn ghost small" data-c="faster" title="Faster (+)">+</button></span>
+        <span class="st-size" data-st="size"><button class="btn ghost small" data-c="smaller" title="Smaller text">A−</button><button class="btn ghost small" data-c="bigger" title="Bigger text">A+</button></span>
+        <button class="btn ghost small" data-c="takeover" data-st="takeover" hidden>Take over</button>
       </div>
     </aside>
     <div class="st-bar">
@@ -51,6 +70,9 @@ export function createStudio({ root, link, hub, remote, toast, audioCtx }) {
   let raf = 0;
   const meters = [];
   let active = false;
+  const MODES = ['teleprompter', 'remote', 'viewer'];
+  let mode = MODES.includes(store.getPrefs().studioMode) ? store.getPrefs().studioMode : 'viewer';
+  let syncTimer = 0;
   let canFinish = false; // desktop app can make the files playable after Stop
   let finishing = null; // the take being made playable
   const mp3On = () => !!store.getPrefs().recMp3;
@@ -117,27 +139,119 @@ export function createStudio({ root, link, hub, remote, toast, audioCtx }) {
   }
 
   // ------------------------------------------------------------------ teleprompter panel
+  const own = () => mode === 'teleprompter';
+  const ctl = () => (own() ? prompter.ctl : remote.ctl);
+
+  function setMode(m) {
+    mode = m;
+    const p = store.getPrefs();
+    p.studioMode = m;
+    store.savePrefs(p);
+    for (const b of root.querySelectorAll('[data-mode]')) b.classList.toggle('on', b.dataset.mode === m);
+    if (own()) {
+      // This computer is the teleprompter now; phones connect to it (its code is in the pill).
+      remote.detach();
+      if (link.targetCode) link.disconnect();
+      prompter.attach($('tp'));
+      fillPicker();
+    } else {
+      prompter.detach();
+      if (hub.role !== m) hub.setRole(m);
+      remote.attach($('tp'));
+      const code = store.getRemoteCode();
+      if (code && !link.targetCode) link.connect(code);
+    }
+    $('pick').hidden = !own();
+    $('size').hidden = !own();
+    $('ctl').hidden = m === 'viewer';
+    sync();
+  }
+
+  function fillPicker() {
+    const pick = $('pick');
+    const cur = prompter.engine.script?.id;
+    pick.replaceChildren(
+      ...lib.all().map((sc) => {
+        const o = document.createElement('option');
+        o.value = sc.id;
+        o.textContent = sc.title || 'Untitled';
+        o.selected = sc.id === cur;
+        return o;
+      })
+    );
+  }
+  $('pick').addEventListener('mousedown', fillPicker); // the list stays current as scripts change
+  $('pick').addEventListener('change', (e) => prompter.ctl.select(e.target.value));
+
   function tpStatus() {
     if (!active) return;
+    const pill = $('tpcode');
+    if (own()) {
+      const n = link.controllerCount;
+      pill.className = 'pill ' + (n ? 'ok' : '');
+      $('tpstatus').textContent = `This computer · ${link.code}${n ? ` · ${n} connected` : ''}`;
+      pill.title = `Phones can control this teleprompter: Connect → enter ${link.code}`;
+      $('ask').hidden = true;
+      return;
+    }
     const t = link.targetStatus;
     const code = link.targetCode;
-    const pill = $('tpcode');
     pill.className = 'pill ' + (t === 'connected' ? 'ok' : t === 'idle' ? '' : t === 'notfound' ? 'bad' : 'wait');
-    $('tpstatus').textContent = !code || hub.role === 'camera' ? 'Not connected' : t === 'connected' ? `Following ${code}` : t === 'notfound' ? `${code} not found` : `Connecting ${code}…`;
+    pill.title = '';
+    $('tpstatus').textContent = !code || hub.role === 'camera' ? 'Not connected' : t === 'connected' ? `${mode === 'remote' ? 'Controlling' : 'Following'} ${code}` : t === 'notfound' ? `${code} not found` : `Connecting ${code}…`;
     $('ask').hidden = !(!code || hub.role === 'camera');
   }
+  // Play button, speed and "someone else is in control", kept current.
+  function sync() {
+    if (!active) return;
+    const c = ctl();
+    const st = c.state || {};
+    const playing = own() ? prompter.engine.playing : !!(st.playing || st.counting);
+    $('ctl').querySelector('[data-c=play]').textContent = playing ? '❚❚' : '▶';
+    $('speed').textContent = String(c.settings?.speed ?? '–');
+    const locked = mode === 'remote' && link.connected && !!remote.ctl.blocked();
+    $('takeover').hidden = !locked;
+    $('ctl').classList.toggle('locked', locked);
+    tpStatus();
+  }
+
   const input = root.querySelector('.st-ask input');
   input.addEventListener('input', () => {
     input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
     if (input.value.length < 4 || !/^[A-HJ-KM-NP-Z2-9]{4}$/.test(input.value) || input.value === link.code) return;
-    hub.setRole('viewer'); // the Studio only watches the script; the remote phone drives it
+    hub.setRole(mode === 'remote' ? 'remote' : 'viewer');
     store.setRemoteCode(input.value);
     link.connect(input.value);
     input.value = '';
     tpStatus();
   });
 
+  function control(k) {
+    const c = ctl();
+    if (k === 'takeover') return hub.takeover();
+    if (!own()) {
+      if (!link.connected) return toast('Not connected to the teleprompter.');
+      if (remote.ctl.blocked()) return toast(`${remote.rosterInfo?.seat || 'Another phone'} is in control. Tap Take over.`);
+    }
+    if (k === 'play') c.toggle();
+    else if (k === 'top') c.top();
+    else if (k === 'back') c.para(-1);
+    else if (k === 'fwd') c.para(1);
+    else if (k === 'slower' || k === 'faster') c.setSpeed((c.settings?.speed || 6) + (k === 'faster' ? 0.5 : -0.5));
+    else if (k === 'smaller' || k === 'bigger') {
+      const fs = prompter.engine.settings.fontSize;
+      c.setSetting('fontSize', Math.round(Math.max(16, Math.min(160, fs * (k === 'bigger' ? 1.1 : 1 / 1.1)))));
+    }
+    sync();
+  }
+
   // ------------------------------------------------------------------ recording
+  // Record/Stop marks go to one take log for the whole take, even if the mode changes.
+  function mark(t, on) {
+    if (t.mine) log.event('rec', { on, take: t.name, hub: 'this computer' });
+    else link.send({ t: 'rec', on, take: t.name });
+  }
+
   async function start() {
     if (!deskApi()) return toast('Recording works in the Sapphire desktop app.');
     const cams = sel.cams.filter((c) => !c.phone && c.stream);
@@ -146,10 +260,11 @@ export function createStudio({ root, link, hub, remote, toast, audioCtx }) {
     const vmime = pick(VIDEO);
     const amime = pick(AUDIO);
     const now = new Date();
-    const script = lib.get(remote.state?.scriptId);
+    const mine = own(); // whose take log gets the marks: this computer's, or the phone's
+    const script = mine ? prompter.engine.script : lib.get(remote.state?.scriptId);
     const name = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}${pad(now.getMinutes())} ${script?.title || 'Take'}`;
     const { token, folder } = await deskApi().begin(name);
-    take = { token, folder, name, script, started: 0, recs: [] };
+    take = { token, folder, name, script, mine, started: 0, recs: [] };
     const vext = /mp4/.test(vmime) ? 'mp4' : 'webm';
     // Open every file first, then start every recorder together.
     // "Camera 1.mp4", or "Camera 1 - Wide.mp4" once it has a name.
@@ -169,7 +284,7 @@ export function createStudio({ root, link, hub, remote, toast, audioCtx }) {
     }
     take.started = Date.now();
     for (const r of take.recs) r.mr.start(1000);
-    link.send({ t: 'rec', on: true, take: name }); // into the teleprompter's take log
+    mark(take, true); // into the teleprompter's take log
     clock = setInterval(tick, 250);
     tick();
     $('saved').textContent = '';
@@ -181,7 +296,7 @@ export function createStudio({ root, link, hub, remote, toast, audioCtx }) {
     take = null;
     clearInterval(clock);
     const ended = Date.now();
-    link.send({ t: 'rec', on: false, take: t.name });
+    mark(t, false);
     tick();
     $('saved').textContent = 'Finishing…';
     for (const r of t.recs) if (r.mr.state !== 'inactive') r.mr.stop();
@@ -200,7 +315,7 @@ export function createStudio({ root, link, hub, remote, toast, audioCtx }) {
       take: t.name,
       started: t.started,
       ended,
-      teleprompter: { code: link.targetCode || null, scriptId: t.script?.id || null, title: t.script?.title || null },
+      teleprompter: { code: t.mine ? link.code : link.targetCode || null, where: t.mine ? 'this computer' : 'phone', scriptId: t.script?.id || null, title: t.script?.title || null },
       files,
     };
     const writeManifest = () => deskApi().writeText(t.token, 'take.json', JSON.stringify(manifest, null, 2));
@@ -239,10 +354,14 @@ export function createStudio({ root, link, hub, remote, toast, audioCtx }) {
   }
 
   root.addEventListener('click', async (e) => {
+    const m = e.target.closest('[data-mode]')?.dataset.mode;
+    if (m) return m !== mode && setMode(m);
+    const c = e.target.closest('[data-c]')?.dataset.c;
+    if (c) return control(c);
     const k = e.target.closest('[data-st]')?.dataset.st;
     if (k === 'rec') take ? stop() : start();
     else if (k === 'folder' && deskApi() && !take) $('root').textContent = await deskApi().chooseRoot();
-    else if (k === 'tpcode') $('ask').hidden = !$('ask').hidden;
+    else if (k === 'tpcode' && !own()) $('ask').hidden = !$('ask').hidden;
     else if (k === 'mp3') {
       store.savePrefs({ ...store.getPrefs(), recMp3: !mp3On() });
       showMp3();
@@ -258,8 +377,9 @@ export function createStudio({ root, link, hub, remote, toast, audioCtx }) {
       active = true;
       root.hidden = false;
       build();
-      remote.attach($('tp'));
-      tpStatus();
+      setMode(mode);
+      clearInterval(syncTimer);
+      syncTimer = setInterval(sync, 300);
     },
     leave() {
       if (take) stop();
@@ -267,7 +387,12 @@ export function createStudio({ root, link, hub, remote, toast, audioCtx }) {
       root.hidden = true;
       cancelAnimationFrame(raf);
       meters.length = 0;
+      clearInterval(syncTimer);
+      prompter.detach();
       remote.detach();
+    },
+    get ownPrompter() {
+      return active && own();
     },
     linkStatus: tpStatus,
   };

@@ -37,6 +37,7 @@ let home;
 let camera;
 let hubView;
 let camFeed;
+let screenNow = 'local';
 const log = createTakeLog({ code: store.getMyCode() });
 const cloud = createCloud({ toast, onChange: () => home?.refresh() });
 
@@ -360,10 +361,11 @@ prompter = createPrompter({
   onSettings: (s) => link.sendToController({ t: 'settings', settings: s }),
   onSelect: (id) => link.sendToController({ t: 'select', id }),
   onVoiceStatus: (s, detail) => link.sendToController({ t: 'voice-status', s, detail }),
+  keysOn: () => screenNow === 'local' || screenNow === 'camera' || (screenNow === 'hub' && !!hubView?.prompterShown),
 });
 remote = createRemote({ link, hub, toast, onHome: showHome });
 camera = createCamera({ engine: prompter.engine, log, toast });
-hubView = createHub({ link, hub, remote, toast, onHome: showHome });
+hubView = createHub({ link, hub, remote, prompter, log, toast, onHome: showHome });
 camFeed = createCamFeed({ link, hub, toast, onHome: showHome });
 // Phones joining as cameras call in; only the Hub (desktop app) takes the call.
 link.onCall = (call, code) => (hubAvailable() ? hubView.onCall(code, call) : call.close());
@@ -388,6 +390,7 @@ home = createHome({
 function route() {
   const hash = location.hash;
   const screen = hash.startsWith('#/remote') ? 'remote' : hash.startsWith('#/home') ? 'home' : hash.startsWith('#/camera') ? 'camera' : hash.startsWith('#/hub') ? 'hub' : hash.startsWith('#/feed') ? 'feed' : 'local';
+  screenNow = screen;
   if (screen === 'feed') camFeed.enter();
   else camFeed.leave();
   if (screen === 'hub') hubView.enter();
