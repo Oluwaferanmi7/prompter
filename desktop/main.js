@@ -8,11 +8,14 @@
 //   npm run dev          http://localhost:5173 (node tools/serve.mjs in the repo root)
 //   npm run dist         build the Windows installer into dist/
 //   --selftest           hidden: open the Hub, report what it sees, quit
-//   --selftest=record    hidden: also go to Studio, record 4 s, report the files, quit
+//   --selftest=record    hidden: also go to Studio, record 4 s, finish the files, report, quit
 const { app, BrowserWindow, session, shell, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { spawn } = require('child_process');
+// Bundled FFmpeg. Inside the installed app it lives next to the asar, not in it.
+const FFMPEG = require('ffmpeg-static').replace('app.asar', 'app.asar.unpacked');
 
 const DEV = process.argv.includes('--dev');
 const SELFTEST = process.argv.some((a) => a.startsWith('--selftest'));
@@ -68,7 +71,7 @@ function fromApp(e) {
 function handle(name, fn) {
   ipcMain.handle(name, (e, ...args) => {
     if (!fromApp(e)) throw new Error('not allowed');
-    return fn(...args);
+    return fn.apply(e, args); // `this` = the event, for calls that report progress
   });
 }
 
@@ -118,6 +121,96 @@ handle('rec:writeText', (token, file, text) => {
   fs.writeFileSync(p, String(text));
   return true;
 });
+// ------------------------------------------------------------------ finishing a take
+// After Stop, make every file usable in normal players and editors, without losing a bit:
+//   video: the recorder's streaming MP4 (no index, can't be scrubbed) → normal MP4 with the
+//          index at the front. Same frames, copied, never re-encoded.
+//   audio: WebM holding 32-bit float PCM → WAV, same samples (+ an optional MP3 copy).
+// The recorder's file moves to Originals\ first and is never changed. Each new file is
+// checked against it (checksum of the actual video frames / audio samples); if they don't
+// match, the original goes back under its normal name and the new one is thrown away.
+function ffmpeg(args, { onTime } = {}) {
+  return new Promise((ok, fail) => {
+    const p = spawn(FFMPEG, ['-hide_banner', '-nostdin', '-loglevel', 'error', '-progress', 'pipe:2', ...args], { windowsHide: true });
+    let out = '';
+    let err = '';
+    p.stdout.on('data', (d) => (out += d));
+    p.stderr.on('data', (d) => {
+      err += d;
+      const m = /out_time_us=(\d+)\s*$/m.exec(String(d));
+      if (m && onTime) onTime(Number(m[1]) / 1000);
+      if (err.length > 20000) err = err.slice(-10000);
+    });
+    p.on('error', fail);
+    p.on('close', (code) => (code === 0 ? ok(out) : fail(new Error(err.split('\n').filter((l) => l && !l.includes('=')).slice(-3).join(' ') || `ffmpeg exit ${code}`))));
+  });
+}
+// One hash per stream, of the packets themselves (video copied, audio as 32-bit float).
+const hashArgs = (kind) => (kind === 'video' ? ['-map', '0:v', '-c', 'copy'] : ['-map', '0:a', '-c:a', 'pcm_f32le']);
+const hashOf = (text) => text.trim().split(/\r?\n/).filter(Boolean).join('|');
+
+async function finishOne(dir, item, opts, report) {
+  const file = safeName(item.file);
+  const src = path.join(dir, file);
+  const base = file.replace(/\.[^.]+$/, '');
+  const origDir = path.join(dir, 'Originals');
+  const orig = path.join(origDir, file);
+  if (!fs.existsSync(src)) throw new Error('file missing');
+  fs.mkdirSync(origDir, { recursive: true });
+  fs.renameSync(src, orig);
+  const video = item.kind === 'video';
+  const outName = base + (video ? '.mp4' : '.wav');
+  const out = path.join(dir, outName);
+  const part = out + '.partial';
+  const mp3Name = !video && opts.mp3 ? base + '.mp3' : null;
+  const mp3Part = mp3Name && path.join(dir, mp3Name) + '.partial';
+  const cleanup = () => {
+    for (const p of [part, mp3Part]) if (p) fs.rmSync(p, { force: true });
+  };
+  try {
+    const args = ['-y', '-i', orig];
+    if (video) args.push('-map', '0', '-c', 'copy', '-movflags', '+faststart', '-f', 'mp4', part);
+    else args.push('-map', '0:a', '-c:a', 'pcm_f32le', '-f', 'wav', part);
+    if (mp3Part) args.push('-map', '0:a', '-c:a', 'libmp3lame', '-b:a', '320k', '-f', 'mp3', mp3Part);
+    args.push(...hashArgs(item.kind), '-f', 'streamhash', '-hash', 'md5', '-');
+    const before = hashOf(await ffmpeg(args, { onTime: (ms) => report(ms) }));
+    const after = hashOf(await ffmpeg(['-i', part, ...hashArgs(item.kind), '-f', 'streamhash', '-hash', 'md5', '-']));
+    if (!before || before !== after) throw new Error('check failed: the new file does not match the original');
+    fs.renameSync(part, out);
+    if (mp3Part) fs.renameSync(mp3Part, path.join(dir, mp3Name));
+    return { file: outName, original: 'Originals/' + file, mp3: mp3Name || undefined, bytes: fs.statSync(out).size, md5: before.replace(/[^|]*MD5=/g, '') };
+  } catch (err) {
+    cleanup();
+    if (!fs.existsSync(src)) fs.renameSync(orig, src); // put it back where it was
+    try {
+      fs.rmdirSync(origDir); // only if empty
+    } catch {}
+    throw err;
+  }
+}
+
+// (token, [{ file, kind }], { mp3, durationMs }) → [{ file, ok, original?, mp3?, error? }]
+// Progress arrives as 'rec:progress' events: { token, file, index, count, pct }.
+handle('rec:finish', async function (token, items, opts = {}) {
+  const dir = takes.get(token);
+  if (!dir) throw new Error('unknown take');
+  const sender = this.sender;
+  const results = [];
+  for (const [index, item] of items.entries()) {
+    const send = (pct) => !sender.isDestroyed() && sender.send('rec:progress', { token, file: item.file, index, count: items.length, pct });
+    send(0);
+    try {
+      const r = await finishOne(dir, item, { mp3: !!opts.mp3 }, (ms) => send(opts.durationMs ? Math.min(99, Math.round((ms / opts.durationMs) * 100)) : 0));
+      results.push({ ok: true, from: item.file, ...r });
+    } catch (err) {
+      results.push({ ok: false, from: item.file, file: item.file, error: String(err?.message || err) });
+    }
+    send(100);
+  }
+  return results;
+});
+handle('rec:canFinish', () => fs.existsSync(FFMPEG));
+
 handle('rec:reveal', (token) => {
   const dir = token ? takes.get(token) : recRoot();
   if (dir) {
@@ -188,7 +281,7 @@ function createWindow() {
               await w(4500);
               r.during = document.querySelector('#hub [data-st=time]')?.textContent;
               document.querySelector('#hub [data-st=rec]')?.click();
-              await w(3000);
+              for (let i = 0; i < 60 && !/Saved/.test(document.querySelector('#hub [data-st=saved]')?.innerText || ''); i++) await w(500);
               r.after = document.querySelector('#hub [data-st=saved]')?.innerText;
             }
             return r;
@@ -198,9 +291,14 @@ function createWindow() {
       if (SELFTEST_RECORD) {
         const root = recRoot();
         out.files = [];
-        for (const d of fs.existsSync(root) ? fs.readdirSync(root) : []) {
-          for (const f of fs.readdirSync(path.join(root, d))) out.files.push(`${d}/${f} ${fs.statSync(path.join(root, d, f)).size} bytes`);
-        }
+        const walk = (rel) => {
+          for (const f of fs.readdirSync(path.join(root, rel))) {
+            const st = fs.statSync(path.join(root, rel, f));
+            if (st.isDirectory()) walk(path.join(rel, f));
+            else out.files.push(`${path.join(rel, f)} ${st.size} bytes`);
+          }
+        };
+        if (fs.existsSync(root)) walk('');
       }
       fs.writeFileSync(path.join(os.tmpdir(), 'sapphire-selftest.json'), JSON.stringify(out, null, 2));
       app.quit();

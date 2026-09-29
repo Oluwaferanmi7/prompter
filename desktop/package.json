@@ -1,7 +1,7 @@
 {
   "name": "sapphire-desktop",
   "productName": "Sapphire",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Sapphire for Windows: the teleprompter app plus the Hub (cameras and mics on this computer).",
   "private": true,
   "main": "main.js",
@@ -17,9 +17,26 @@
   "build": {
     "appId": "com.sapphireproductions.app",
     "productName": "Sapphire",
-    "files": ["main.js", "preload.js", "icon.png", "icon.ico"],
-    "win": { "target": "nsis", "icon": "icon.ico" },
-    "nsis": { "oneClick": true, "perMachine": false, "shortcutName": "Sapphire" },
-    "directories": { "output": "dist" }
+    "files": [
+      "main.js",
+      "preload.js",
+      "icon.png",
+      "icon.ico"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "Sapphire"
+    },
+    "directories": {
+      "output": "dist"
+    }
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.3.0"
   }
 }

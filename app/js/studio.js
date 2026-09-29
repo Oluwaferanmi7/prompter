@@ -4,6 +4,10 @@
 // take.json describing it. The teleprompter's take log gets the record start/stop too, so
 // the editor can line everything up.
 //
+// After Stop the desktop app (0.3.0+) makes the files usable everywhere: MP4s rebuilt so they
+// can be scrubbed, mic WebMs turned into 32-bit float WAVs (+ MP3 if switched on). Nothing is
+// re-encoded; the recorder's own files are kept in the take's Originals folder.
+//
 // This first version records with the app's own engine (MediaRecorder) so recording and
 // the live previews share the same device handles. Phones show as previews; recording
 // them (full quality on the phone, sent over after Stop) is the next step.
@@ -35,7 +39,7 @@ export function createStudio({ root, link, hub, remote, toast, audioCtx }) {
       </div>
     </aside>
     <div class="st-bar">
-      <div class="st-left"><button class="btn ghost small" data-st="folder">Save to…</button><span class="muted small st-root" data-st="root"></span></div>
+      <div class="st-left"><button class="btn ghost small" data-st="folder">Save to…</button><button class="btn ghost small" data-st="mp3" hidden>+ MP3: Off</button><span class="muted small st-root" data-st="root"></span></div>
       <div class="st-center"><button class="cam-rec" data-st="rec" aria-label="Record"><span></span></button><span class="st-time" data-st="time" hidden>00:00</span></div>
       <div class="st-right muted small" data-st="saved"></div>
     </div>`;
@@ -47,6 +51,18 @@ export function createStudio({ root, link, hub, remote, toast, audioCtx }) {
   let raf = 0;
   const meters = [];
   let active = false;
+  let canFinish = false; // desktop app can make the files playable after Stop
+  let finishing = null; // the take being made playable
+  const mp3On = () => !!store.getPrefs().recMp3;
+  const showMp3 = () => {
+    $('mp3').hidden = !canFinish;
+    $('mp3').textContent = `+ MP3: ${mp3On() ? 'On' : 'Off'}`;
+    $('mp3').title = 'Also save an MP3 of each mic, next to the WAV';
+  };
+  deskApi()?.onProgress?.((p) => {
+    if (finishing?.token !== p.token) return;
+    $('saved').textContent = `Making files playable… ${p.index + 1}/${p.count} · ${p.pct}%`;
+  });
 
   // ------------------------------------------------------------------ layout
   function build() {
@@ -91,6 +107,12 @@ export function createStudio({ root, link, hub, remote, toast, audioCtx }) {
     cancelAnimationFrame(raf);
     draw();
     deskApi()?.root().then((r) => ($('root').textContent = r));
+    Promise.resolve(deskApi()?.canFinish?.())
+      .catch(() => false)
+      .then((ok) => {
+        canFinish = !!ok;
+        showMp3();
+      });
     if (!deskApi()) $('root').textContent = 'Recording works in the Sapphire desktop app.';
   }
 
@@ -181,12 +203,30 @@ export function createStudio({ root, link, hub, remote, toast, audioCtx }) {
       teleprompter: { code: link.targetCode || null, scriptId: t.script?.id || null, title: t.script?.title || null },
       files,
     };
-    await deskApi().writeText(t.token, 'take.json', JSON.stringify(manifest, null, 2));
+    const writeManifest = () => deskApi().writeText(t.token, 'take.json', JSON.stringify(manifest, null, 2));
+    await writeManifest(); // written before finishing too, so a crash there still leaves a described take
+    if (canFinish) {
+      finishing = t;
+      $('saved').textContent = 'Making files playable…';
+      const todo = files.filter((f) => !f.error && f.bytes);
+      const results = await deskApi()
+        .finish(t.token, todo.map((f) => ({ file: f.file, kind: f.kind })), { mp3: mp3On(), durationMs: ended - t.started })
+        .catch((err) => todo.map((f) => ({ ok: false, from: f.file, error: String(err?.message || err) })));
+      finishing = null;
+      for (const r of results) {
+        const f = files.find((x) => x.file === r.from);
+        if (!f) continue;
+        if (r.ok) Object.assign(f, { file: r.file, original: r.original, mp3: r.mp3, bytes: r.bytes, md5: r.md5 });
+        else f.finishError = r.error; // the recorder's file is still there, under its own name
+      }
+      await writeManifest();
+    }
     const bad = files.filter((f) => f.error);
+    const unfinished = files.filter((f) => f.finishError);
     const saved = $('saved');
-    saved.innerHTML = `${bad.length ? `<b class="bad-text">${bad.length} file(s) had a problem.</b> ` : ''}Saved ${files.length} file${files.length === 1 ? '' : 's'} · ${fmt(ended - t.started)} <button class="btn ghost small" data-st="open">Open folder</button>`;
+    saved.innerHTML = `${bad.length ? `<b class="bad-text">${bad.length} file(s) had a problem.</b> ` : ''}${unfinished.length ? `<b class="bad-text">${unfinished.length} file(s) couldn't be made playable (originals kept).</b> ` : ''}Saved ${files.length} file${files.length === 1 ? '' : 's'} · ${fmt(ended - t.started)} <button class="btn ghost small" data-st="open">Open folder</button>`;
     saved.querySelector('[data-st=open]').onclick = () => deskApi().reveal(t.token);
-    toast(bad.length ? 'Take saved, with problems. Check the folder.' : 'Take saved.');
+    toast(bad.length || unfinished.length ? 'Take saved, with problems. Check the folder.' : 'Take saved.');
   }
 
   function tick() {
@@ -203,6 +243,10 @@ export function createStudio({ root, link, hub, remote, toast, audioCtx }) {
     if (k === 'rec') take ? stop() : start();
     else if (k === 'folder' && deskApi() && !take) $('root').textContent = await deskApi().chooseRoot();
     else if (k === 'tpcode') $('ask').hidden = !$('ask').hidden;
+    else if (k === 'mp3') {
+      store.savePrefs({ ...store.getPrefs(), recMp3: !mp3On() });
+      showMp3();
+    }
   });
 
   return {
