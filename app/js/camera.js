@@ -92,7 +92,7 @@ export function createCamera({ engine, log, toast }) {
     const s = lib.get(engine.script?.id);
     const id = store.uid();
     const started = Date.now();
-    const mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000, audioBitsPerSecond: 128_000 });
+    const mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 20_000_000, audioBitsPerSecond: 128_000 });
     rec = { mr, id, started, n: 0, pending: Promise.resolve() };
     await recs.begin({ id, started, ended: started, mime, title: s?.title || 'Take', scriptId: s?.id || null });
     mr.ondataavailable = (e) => {

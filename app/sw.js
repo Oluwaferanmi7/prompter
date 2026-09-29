@@ -1,6 +1,6 @@
 // Offline cache for the app shell. Stale-while-revalidate: opens instantly (even with
 // no signal on set), fetches updates in the background for the next launch.
-const VERSION = 'prompter-v22';
+const VERSION = 'prompter-v23';
 const SHELL = [
   './',
   'index.html',
@@ -13,6 +13,7 @@ const SHELL = [
   'js/camera.js',
   'js/camfeed.js',
   'js/recstore.js',
+  'js/mp4fix.js',
   'js/cloud.js',
   'js/config.js',
   'js/home.js',
